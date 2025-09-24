@@ -1,128 +1,65 @@
 {
-  "0d0d6825-20b3-4595-b2be-44b75f8e0cbb": "cs_test_b1KQ2Puv7Gh3MWu0Ydqycmi7EdxQtULkmD9I7N1sjQG9tnlIn1dLMuTxTa",
-  "1b0f9fef-af9f-4a65-8909-b019fabb12fb": "cs_test_b1CeZi06ko6sR7nUiVDNa8m9lOkjVSpWusXK7wqibdxSFDTWDJNx9ZUeeH",
-  "54ca8d40-6e1d-4dd7-8851-bec85b32a253": "cs_test_b1sfTRPREwtS1DKiyK3IO8gU45GxYffbkItRtXUY6gti2mr0NAE2h1akKJ",
-  "5b1e910e-78cf-497b-926d-2a835b34231b": "cs_test_b13owRtgigorxoDzRsltD3d3dzIWsqCtE9F1S9pPQkRVJINZsc1baGvU4H",
-  "a5ee7921-c5be-4670-a7ee-ccad84a239c1": "cs_test_b10woHV7DAfpnpD9oxIuFOXOFFDK9TT0REAPpv20TMwaq5OLxibxkAo2Ee",
-  "aef54d19-82af-4b84-a0aa-8025336cc265": "cs_test_b11cisBgCCrJcLxtEg7fQy1NcHS4XHXHO85piR5Z4UA7kJEGRvaaF24ob7",
-  "c33e8982-b66d-4403-ae61-7550e614ddc1": "cs_test_b1CfcTkH1QkUTsL4rlvJRRimfDEqCG3QS37XU8X6MkRAPAJJlbVQ0l6Uff",
-  "d2f21508-4673-4cd7-9196-f44515f2fbe9": {
-    "awaiting_payment": true,
-    "entity_type": "PAYMENT",
-    "payment_checkout_id": "cs_test_b12ky6HDofKVeJAwWrsdQehEGoQ1cMo61bFPoY6QeFJGNy0uoiscsEDNNL",
-    "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b12ky6HDofKVeJAwWrsdQehEGoQ1cMo61bFPoY6QeFJGNy0uoiscsEDNNL#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
-    "payment_quote": {
-      "billingCycle": "yearly",
-      "price": 299.0,
-      "productName": "Classic",
-      "stateFilingFee": 300.0,
-      "totalDueNow": 599.0
-    },
-    "payment_status": "pending"
-  },
-  "daab8b9b-4b3d-48e4-8cc7-11c249d5072e": "cs_test_b1Ycoz9hPdF4Zibpr9QtyJkYJgQsDtyAKJxui4q4PIMKxBGhNMJo1gwnmR",
-  "e0331e0b-1463-4c95-8a7b-8f1430821641": "cs_test_b1IXDPH9jfgKh1DzuHOkUDxL1RrOF7kMe8XrCMqdqGeq0HzK9HR5J5gBUh",
-  "e73a5832-894a-4a1f-9ba5-1aa5d359e438": "cs_test_b1G2f7VFi00qJ79G9IwvomY2UkWJKxful7cP7lJORlPpin6XWtJKz5qyJm",
   "session_attributes": {
-    "0d0d6825-20b3-4595-b2be-44b75f8e0cbb": {
-      "awaiting_payment": true,
-      "entity_type": "PAYMENT",
-      "payment_checkout_id": "cs_test_b1KQ2Puv7Gh3MWu0Ydqycmi7EdxQtULkmD9I7N1sjQG9tnlIn1dLMuTxTa",
-      "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b1KQ2Puv7Gh3MWu0Ydqycmi7EdxQtULkmD9I7N1sjQG9tnlIn1dLMuTxTa#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
-      "payment_quote": {
-        "billingCycle": "yearly",
-        "price": 299.0,
-        "productName": "Classic",
-        "stateFilingFee": 300.0,
-        "totalDueNow": 599.0
-      },
-      "payment_status": "pending"
+    "b4848f8f-980a-402e-9882-c5a7f0e9d8fa": {
+      "entity_type": "LLC",
+      "awaiting_payment": false,
+      "payment_status": null,
+      "payment_quote": null,
+      "payment_checkout_url": null,
+      "payment_checkout_id": null,
+      "conversation_history": [
+        {
+          "timestamp": "2025-09-24T16:16:27.905136",
+          "user_message": "hi my name is Om Sharma, email: jahera6253@dotxan.com, phone: 9876543211",
+          "agent_response": "[BASE AGENT]\n\n__Great to meet you, Om!__ I've just sent a secure 6-digit code to your email __jahera6253@dotxan.com__. Please enter it here to verify your account before we continue with your business setup.\n\n__Your Information So Far:__\n\n| __Field Name__  | __Value__        |\n| ---             | ---              |\n| __Full Name__   | Om Sharma        |\n| __Email__       | jahera6253@dotxan.com |\n| __Phone__       | 9876543211       |\n\nWe\u2019re well on our way \u2014 I\u2019m excited to help you launch your business! Please enter the verification code now.",
+          "agent_type": "BASE",
+          "agent_name": "Base Agent"
+        },
+        {
+          "timestamp": "2025-09-24T16:16:56.847269",
+          "user_message": "535268",
+          "agent_response": "[BASE AGENT]\n\n__Fantastic, Om! Your email is verified successfully.__ Your secure account is all set up, and we won\u2019t need to verify it again.\n\nI\u2019ve sent you a __welcome email__ with next steps. Let\u2019s move on to capturing your business details now!\n\nHere's your progress:\n\n| __Field Name__  | __Value__        |\n| ---             | ---              |\n| __Full Name__   | Om Sharma        |\n| __Email__       | __jahera6253@dotxan.com__ |\n| __Phone__       | 9876543211       |\n\n__Next step:__ Please provide your __proposed company name__ (without designators), __main business purpose__, and the __U.S. state__ where you'd like to incorporate.",
+          "agent_type": "BASE",
+          "agent_name": "Base Agent"
+        },
+        {
+          "timestamp": "2025-09-24T16:17:27.046480",
+          "user_message": "State: New York\nProposed Business Name: Quantix Labs\nBusiness Purpose: Developing quantum-inspired optimization software for financial institutions.",
+          "agent_response": "[BASE AGENT]\n\n__Great choices, Om!__ Here's what we have so far:\n\n| __Field Name__        | __Value__                                            |\n| ---                   | ---                                                  |\n| __Full Name__         | Om Sharma                                            |\n| __Email__             | __jahera6253@dotxan.com__                            |\n| __Phone__             | 9876543211                                           |\n| __Business Name__     | Quantix Labs                                         |\n| __Business Purpose__  | Developing quantum-inspired optimization software for financial institutions. |\n| __State__             | New York                                             |\n\n__Next up:__ Let's select your __NAICS code__, which classifies your business for compliance and official records. Could you tell me a bit more about your business, or would you like me to suggest some options based on what's provided?",
+          "agent_type": "BASE",
+          "agent_name": "Base Agent"
+        },
+        {
+          "timestamp": "2025-09-24T16:17:45.869599",
+          "user_message": "suggest",
+          "agent_response": "[BASE AGENT]\n\n__Great! Here are some NAICS options for your business:__\n\n1. **541715 - Research and Development in the Physical, Engineering, and Life Sciences (except Nanotechnology and Biotechnology)**  \n   \u2014 Engages in research and development in the fields of physics, engineering, and life sciences.\n\n2. **541511 - Custom Computer Programming Services**  \n   \u2014 Specializes in writing, modifying, testing, and supporting software to meet client-specific needs.\n\n3. **519190 - All Other Information Services**  \n   \u2014 Offers information services such as news syndicates, libraries, and archives.\n\n4. **523920 - Portfolio Management**  \n   \u2014 Provides portfolio management and investment advice.\n\n5. **541512 - Computer Systems Design Services**  \n   \u2014 Involves planning and designing computer systems that integrate hardware, software, and communication technologies.\n\nPlease choose the one that best suits your business!",
+          "agent_type": "BASE",
+          "agent_name": "Base Agent"
+        },
+        {
+          "timestamp": "2025-09-24T16:18:03.446973",
+          "user_message": "2",
+          "agent_response": "[BASE AGENT]\n\n__Excellent choice!__ You've selected:\n\n**541511 - Custom Computer Programming Services**  \n\u2014 Specializes in writing, modifying, testing, and supporting software to meet client-specific needs.\n\nHere's your updated information:\n\n| __Field Name__        | __Value__                                            |\n| ---                   | ---                                                  |\n| __Full Name__         | Om Sharma                                            |\n| __Email__             | __jahera6253@dotxan.com__                            |\n| __Phone__             | 9876543211                                           |\n| __Business Name__     | Quantix Labs                                         |\n| __Business Purpose__  | Developing quantum-inspired optimization software for financial institutions. |\n| __State__             | New York                                             |\n| __NAICS Code__        | 541511 - Custom Computer Programming Services \u2014 Specializes in writing, modifying, testing, and supporting software. |\n\n__Next step:__ Please let me know your preferred __entity type__ \u2014 options include __LLC, C-Corp, or S-Corp__.",
+          "agent_type": "BASE",
+          "agent_name": "Base Agent"
+        },
+        {
+          "timestamp": "2025-09-24T16:18:29.094217",
+          "user_message": "LLC",
+          "agent_response": "[BASE AGENT]\n\n__Wonderful!__ You've chosen to form an **LLC**. This gives you great flexibility and ease in managing your business.\n\nHere's a snapshot of your current information:\n\n| __Field Name__        | __Value__                                            |\n| ---                   | ---                                                  |\n| __Full Name__         | Om Sharma                                            |\n| __Email__             | __jahera6253@dotxan.com__                            |\n| __Phone__             | 9876543211                                           |\n| __Business Name__     | Quantix Labs                                         |\n| __Business Purpose__  | Developing quantum-inspired optimization software for financial institutions. |\n| __State__             | New York                                             |\n| __NAICS Code__        | 541511 - Custom Computer Programming Services \u2014 Specializes in writing, modifying, testing, and supporting software. |\n| __Entity Type__       | LLC                                                  |\n\n__Next steps:__ We'll handle the paperwork and compliance details from here. You\u2019ll get updates on how your incorporation process is moving along. Feel free to ask any questions or provide further instructions!",
+          "agent_type": "LLC",
+          "agent_name": "Base Agent"
+        },
+        {
+          "timestamp": "2025-09-24T16:19:42.312717",
+          "user_message": "ok",
+          "agent_response": "[LLC AGENT]\n\nLet's start the LLC formation process. \n\n__First, choose a designator for your LLC:__\n\n- **LLC**\n- **L.L.C.**\n- **Limited Liability Company**\n\nMost businesses choose \"LLC\" for simplicity. Which one would you like for Quantix Labs?",
+          "agent_type": "LLC",
+          "agent_name": "LLC Agent"
+        }
+      ]
     },
-    "54ca8d40-6e1d-4dd7-8851-bec85b32a253": {
-      "awaiting_payment": true,
-      "entity_type": "PAYMENT",
-      "payment_checkout_id": "cs_test_b1sfTRPREwtS1DKiyK3IO8gU45GxYffbkItRtXUY6gti2mr0NAE2h1akKJ",
-      "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b1sfTRPREwtS1DKiyK3IO8gU45GxYffbkItRtXUY6gti2mr0NAE2h1akKJ#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
-      "payment_quote": {
-        "billingCycle": "yearly",
-        "price": 299.0,
-        "productName": "Classic",
-        "stateFilingFee": 425.0,
-        "totalDueNow": 724.0
-      },
-      "payment_status": "pending"
-    },
-    "5b1e910e-78cf-497b-926d-2a835b34231b": {
-      "awaiting_payment": true,
-      "entity_type": "PAYMENT",
-      "payment_checkout_id": "cs_test_b13owRtgigorxoDzRsltD3d3dzIWsqCtE9F1S9pPQkRVJINZsc1baGvU4H",
-      "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b13owRtgigorxoDzRsltD3d3dzIWsqCtE9F1S9pPQkRVJINZsc1baGvU4H#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
-      "payment_quote": {
-        "billingCycle": "yearly",
-        "price": 299.0,
-        "productName": "Classic",
-        "stateFilingFee": 200.0,
-        "totalDueNow": 499.0
-      },
-      "payment_status": "pending"
-    },
-    "a5ee7921-c5be-4670-a7ee-ccad84a239c1": {
-      "awaiting_payment": true,
-      "entity_type": "PAYMENT",
-      "payment_checkout_id": "cs_test_b10woHV7DAfpnpD9oxIuFOXOFFDK9TT0REAPpv20TMwaq5OLxibxkAo2Ee",
-      "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b10woHV7DAfpnpD9oxIuFOXOFFDK9TT0REAPpv20TMwaq5OLxibxkAo2Ee#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
-      "payment_quote": {
-        "billingCycle": "yearly",
-        "price": 299.0,
-        "productName": "Classic",
-        "stateFilingFee": 200.0,
-        "totalDueNow": 499.0
-      },
-      "payment_status": "pending"
-    },
-    "aef54d19-82af-4b84-a0aa-8025336cc265": {
-      "awaiting_payment": true,
-      "entity_type": "PAYMENT",
-      "payment_checkout_id": "cs_test_b11cisBgCCrJcLxtEg7fQy1NcHS4XHXHO85piR5Z4UA7kJEGRvaaF24ob7",
-      "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b11cisBgCCrJcLxtEg7fQy1NcHS4XHXHO85piR5Z4UA7kJEGRvaaF24ob7#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
-      "payment_quote": {
-        "billingCycle": "yearly",
-        "price": 299.0,
-        "productName": "Classic",
-        "stateFilingFee": 200.0,
-        "totalDueNow": 499.0
-      },
-      "payment_status": "pending"
-    },
-    "c33e8982-b66d-4403-ae61-7550e614ddc1": {
-      "entity_type": "PAYMENT",
-      "awaiting_payment": true,
-      "payment_status": "pending",
-      "payment_quote": {
-        "productName": "Classic",
-        "price": 299.0,
-        "billingCycle": "yearly",
-        "stateFilingFee": 100.0,
-        "totalDueNow": 399.0
-      },
-      "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b1CfcTkH1QkUTsL4rlvJRRimfDEqCG3QS37XU8X6MkRAPAJJlbVQ0l6Uff#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
-      "payment_checkout_id": "cs_test_b1CfcTkH1QkUTsL4rlvJRRimfDEqCG3QS37XU8X6MkRAPAJJlbVQ0l6Uff"
-    },
-    "e0331e0b-1463-4c95-8a7b-8f1430821641": {
-      "awaiting_payment": true,
-      "entity_type": "PAYMENT",
-      "payment_checkout_id": "cs_test_b1IXDPH9jfgKh1DzuHOkUDxL1RrOF7kMe8XrCMqdqGeq0HzK9HR5J5gBUh",
-      "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b1IXDPH9jfgKh1DzuHOkUDxL1RrOF7kMe8XrCMqdqGeq0HzK9HR5J5gBUh#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
-      "payment_quote": {
-        "billingCycle": "yearly",
-        "price": 299.0,
-        "productName": "Classic",
-        "stateFilingFee": 300.0,
-        "totalDueNow": 599.0
-      },
-      "payment_status": "pending"
-    },
-    "b0550629-70e6-4a96-95c2-fe719465296f": {
+    "20cc7208-68a5-4087-b0b2-d6c66b4cf961": {
       "entity_type": "BASE",
       "awaiting_payment": false,
       "payment_status": null,
@@ -131,23 +68,16 @@
       "payment_checkout_id": null,
       "conversation_history": [
         {
-          "timestamp": "2025-09-24T15:56:33.897773",
-          "user_message": "hi my name is Om Sharma, email: nanavi4722@dotxan.com, phone: 9876543211",
-          "agent_response": "[BASE AGENT]\n\nI've sent a secure 6-digit code to your email **nanavi4722@dotxan.com**. Please enter it here to verify your account before we continue. This is a key step to ensure your information stays private and secure.\n\n__Summary Table:__\n\n| __Field Name__ | __Value__ |\n| --- | --- |\n| __Full Name__ | Om Sharma |\n| __Email__ | nanavi4722@dotxan.com |\n| __Phone__ | 9876543211 |\n\nLooking forward to moving ahead with you!",
+          "timestamp": "2025-09-24T18:36:24.347208",
+          "user_message": "Hi my name is Om Sharma, email: jahera6253@dotxan.com, phone: 9876543211",
+          "agent_response": "[BASE AGENT]\n\nI've sent a secure 6-digit code to your email **jahera6253@dotxan.com**. Please enter it here to verify your account before we continue.\n\nYour progress is going great, Om! Your information is kept __safe__ and __secure__. Once verified, we\u2019ll move on to incorporating your business.\n\n### Snapshot\n\n| __Field Name__ | __Value__ |\n| --- | --- |\n| __Full Name__ | Om Sharma |\n| __Email__ | jahera6253@dotxan.com |\n| __Phone__ | 9876543211 |",
           "agent_type": "BASE",
           "agent_name": "Base Agent"
         },
         {
-          "timestamp": "2025-09-24T15:57:35.930743",
-          "user_message": "759065",
-          "agent_response": "[BASE AGENT]\n\n__Congratulations__, your email is verified and your secure account is all set! \ud83c\udf89  \nWe\u2019ve sent you a __welcome email__ with your __login credentials__ and __next steps__ \u2014 please check your __inbox__ (and __spam folder__, just in case).\n\nNow, let\u2019s get your incorporation details moving!\n\n__Summary Table:__\n\n| __Field Name__ | __Value__ |\n| --- | --- |\n| __Full Name__ | Om Sharma |\n| __Email__ | **nanavi4722@dotxan.com** |\n| __Phone__ | 9876543211 |\n\nPlease share your __proposed company name__, __business purpose__, and __U.S. state__ where you wish to incorporate next.",
-          "agent_type": "BASE",
-          "agent_name": "Base Agent"
-        },
-        {
-          "timestamp": "2025-09-24T15:59:18.725334",
-          "user_message": "State: Texas\nProposed Business Name: CleanSurge AI\nBusiness Purpose: We develop AI-powered environmental monitoring and pollution management platforms for industrial and municipal applications.",
-          "agent_response": "[BASE AGENT]\n\nFantastic! Let's ensure everything is captured correctly. Here's a summary of your incorporation details:\n\n__Summary Table:__\n\n| __Field Name__ | __Value__ |\n| --- | --- |\n| __Full Name__ | Om Sharma |\n| __Email__ | **nanavi4722@dotxan.com** |\n| __Phone__ | 9876543211 |\n| __Business Name__ | CleanSurge AI |\n| __Business Purpose__ | We develop AI-powered environmental monitoring and pollution management platforms for industrial and municipal applications. |\n| __State__ | Texas |\n\nNext, we'll need to select your __NAICS code__ which classifies your business for compliance and official records. Here are some options based on your description:\n\n1. **541511 - Custom Computer Programming Services** \u2014 Writing, modifying, testing, and supporting software to meet a client's specific requirements.\n2. **541512 - Computer Systems Design Services** \u2014 Planning and designing computer systems that integrate computer hardware, software, and communication technologies.\n3. **541620 - Environmental Consulting Services** \u2014 Providing advice and assistance to businesses and other organizations on environmental issues.\n4. **513210 - Data Processing, Hosting, and Related Services** \u2014 Providing the infrastructure for hosting or data processing services.\n\nPlease choose a number from the options above or describe the one you feel best fits your business.",
+          "timestamp": "2025-09-24T18:37:09.243092",
+          "user_message": "791351",
+          "agent_response": "[BASE AGENT]\n\n__Congratulations, Om!__ Your email has been verified successfully, and your secure account is all set! \ud83c\udf89\n\nWe\u2019ve sent you a welcome email with your login credentials and next steps \u2014 please check your inbox (and spam folder, just in case). Now, let\u2019s get your incorporation details moving.\n\n### Snapshot\n\n| __Field Name__ | __Value__ |\n| --- | --- |\n| __Full Name__ | Om Sharma |\n| __Email__ | __jahera6253@dotxan.com__ |\n| __Phone__ | 9876543211 |\n\n**What\u2019s next?** Please share your proposed business name, main business purpose, and the U.S. state where you want to incorporate.",
           "agent_type": "BASE",
           "agent_name": "Base Agent"
         }

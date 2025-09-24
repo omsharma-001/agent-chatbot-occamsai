@@ -3,6 +3,8 @@ import os
 import json
 import uuid
 import contextvars
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import TypedDict, Optional, Literal, Dict
 
 # Bootstrap env (OpenAI, SendGrid, Stripe, SITE_URL, etc.)
@@ -15,6 +17,7 @@ from base_prompt import BasePrompt
 from llc_prompt import LLCPrompt
 from corp_prompt import CorpPrompt
 from payment_prompt import PaymentPrompt
+from extractor_prompt import ExtractorPrompt
 from otp_service import OTPService
 
 # Use the real PaymentService
@@ -24,6 +27,7 @@ from payment_service import PaymentService
 # ========= GLOBAL CONTEXT =========
 CURRENT_SESSION = contextvars.ContextVar("CURRENT_SESSION", default=None)
 _SESSION_STORE = {}  # Store actual session objects to preserve conversation history
+_ACTIVE_EXTRACTIONS = set()  # Track active extraction sessions
 
 
 # ========= TOOL ARG TYPES =========
@@ -307,6 +311,90 @@ async def checkPaymentStatus(args: CheckPaymentStatusArgs) -> str:
     return norm
 
 
+# ========= BACKGROUND EXTRACTION =========
+def run_background_extraction(session_id: str, conversation_history: list):
+    """Run extraction in background - NON-BLOCKING with overlap protection"""
+    
+    global _ACTIVE_EXTRACTIONS
+    
+    # Check if extraction is already running for this session
+    if session_id in _ACTIVE_EXTRACTIONS:
+        print(f"[EXTRACTOR] ⏸️ Extraction already running for {session_id} - skipping")
+        return None
+    
+    def extract_worker():
+        """Worker function that runs in separate thread"""
+        try:
+            # Mark as active
+            _ACTIVE_EXTRACTIONS.add(session_id)
+            print(f"[EXTRACTOR] 🔍 Starting extraction for {session_id} (Active: {len(_ACTIVE_EXTRACTIONS)})")
+            
+            # Extract only assistant messages
+            assistant_messages = []
+            for exchange in conversation_history:
+                agent_response = exchange.get('agent_response', '').strip()
+                agent_name = exchange.get('agent_name', 'Unknown Agent')
+                timestamp = exchange.get('timestamp', 'Unknown time')
+                if agent_response:
+                    assistant_messages.append({
+                        'response': agent_response,
+                        'agent': agent_name,
+                        'time': timestamp
+                    })
+            
+            if not assistant_messages:
+                print(f"[EXTRACTOR] ⚠️ No assistant messages for {session_id}")
+                return
+            
+            # Prepare analysis text
+            analysis_text = f"ASSISTANT RESPONSES FROM SESSION {session_id}:\n\n"
+            for i, msg in enumerate(assistant_messages, 1):
+                analysis_text += f"Response {i} ({msg['time']}) - {msg['agent']}:\n"
+                analysis_text += f"{msg['response']}\n\n"
+            
+            analysis_text += "Please extract and analyze all key information from these assistant responses."
+            
+            # Create event loop (same pattern as your other agents)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                print(f"[EXTRACTOR] 🤖 Analyzing {len(assistant_messages)} messages...")
+                
+                # Run extraction
+                result = loop.run_until_complete(
+                    Runner.run(extractor_agent, analysis_text)
+                )
+                
+                # Print results to terminal
+                extraction_result = (result.final_output or "").strip()
+                import datetime
+                print(f"\n" + "="*70)
+                print(f"[EXTRACTOR] 📊 RESULTS - Session: {session_id}")
+                print(f"="*70)
+                print(f"Messages Analyzed: {len(assistant_messages)}")
+                print(f"Completed: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                print(f"\n{extraction_result}")
+                print(f"="*70 + "\n")
+                
+            finally:
+                loop.close()
+                
+        except Exception as e:
+            print(f"[EXTRACTOR] ❌ Error: {e}")
+        finally:
+            # Always remove from active set
+            _ACTIVE_EXTRACTIONS.discard(session_id)
+            print(f"[EXTRACTOR] ✅ Completed for {session_id} (Active: {len(_ACTIVE_EXTRACTIONS)})")
+    
+    # Submit to thread pool (NON-BLOCKING)
+    with ThreadPoolExecutor() as executor:
+        future = executor.submit(extract_worker)
+        # No .result() call - returns immediately!
+        print(f"[EXTRACTOR] 🚀 Queued extraction for {session_id}")
+        return future
+
+
 # ========= AGENTS =========
 corp_agent = Agent(
     name="Corp Assistant",
@@ -363,6 +451,17 @@ base_agent = Agent(
         "- Only after successfully calling sendEmailOtp should you tell the user the code was sent."
     ),
     tools=[sendEmailOtp, verifyEmailOtp, setEntityType]
+)
+
+extractor_agent = Agent(
+    name="Conversation Extractor",
+    model="gpt-4o",
+    instructions=(
+        "🏷️ AGENT IDENTIFICATION: You are the Conversation Extractor Agent. "
+        "Always start your responses with '[EXTRACTOR AGENT]'.\n\n"
+        + ExtractorPrompt.get_mode_prompt()
+    ),
+    tools=[]
 )
 
 
@@ -743,6 +842,10 @@ def respond(message: str, history, session: Optional[OpenAIConversationsSession]
     conv_id = getattr(session, "conversation_id", None)
     if conv_id:
         _save_session_attributes(conv_id, session)
+
+    # 🆕 Trigger background extraction (NON-BLOCKING)
+    if conv_id and len(conversation_history) > 0:
+        run_background_extraction(conv_id, conversation_history)
 
     if session.entity_type == "PAYMENT" and getattr(session, "show_payment_summary", False):
         try:

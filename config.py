@@ -4,11 +4,11 @@ import os
 def setup_environment():
     # ==== OpenAI ====
     os.environ["OPENAI_API_KEY"] = (
-        "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"
+        "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"
     )
 
     # ==== SendGrid ====
-    os.environ["SENDGRID_API_KEY"] = "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"
+    os.environ["SENDGRID_API_KEY"] = "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"
     os.environ["MAIL_FROM"] = "himewe5824@dawhe.com"
     os.environ["MAIL_FROM_NAME"] = "Incubation AI"
 
