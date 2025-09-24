@@ -1,6 +1,7 @@
 # gradio_app_conversations_multi.py
 import os
 import json
+import uuid
 import contextvars
 from typing import TypedDict, Optional, Literal, Dict
 
@@ -22,6 +23,7 @@ from payment_service import PaymentService
 
 # ========= GLOBAL CONTEXT =========
 CURRENT_SESSION = contextvars.ContextVar("CURRENT_SESSION", default=None)
+_SESSION_STORE = {}  # Store actual session objects to preserve conversation history
 
 
 # ========= TOOL ARG TYPES =========
@@ -147,7 +149,7 @@ async def updateEntityType(args: UpdateEntityTypeArgs) -> str:
     print(f"[AGENT LOG] 🔁 updateEntityType (Payment) -> {old} → {getattr(sess,'entity_type')} (flags reset)")
     return f"Entity type updated to {target}. We’ll refresh totals and continue."
 
-# Fallback fees (same as your table)
+# Fallback fees
 _FALLBACK_FEES = {
     'Alabama':        {'llc': 200, 's-corp': 208, 'c-corp': 208},
     'Alaska':         {'llc': 250, 's-corp': 250, 'c-corp': 250},
@@ -234,7 +236,6 @@ async def createPaymentLink(args: CreatePaymentLinkArgs) -> str:
     # ✅ ensure a conversation_id exists
     conv_id = getattr(sess, "conversation_id", None)
     if not conv_id:
-        import uuid
         conv_id = str(uuid.uuid4())
         setattr(sess, "conversation_id", conv_id)
 
@@ -258,7 +259,6 @@ async def createPaymentLink(args: CreatePaymentLinkArgs) -> str:
 
     try:
         SITE_URL = os.getenv("SITE_URL", "http://localhost:7860").rstrip("/")
-        # If your PaymentService accepts success/cancel, pass them explicitly (best):
         out = PaymentService.create_payment_link(
             product_name=quote["productName"],
             price=quote["price"],
@@ -273,17 +273,16 @@ async def createPaymentLink(args: CreatePaymentLinkArgs) -> str:
         checkout_url = out.get("url")
         setattr(sess, "payment_checkout_url", checkout_url)
         setattr(sess, "payment_checkout_id", checkout_id)
-        
+
         # ✅ SAVE again with the checkout details
         _save_session_attributes(conv_id, sess)
-        
+
         print(f"[TOOL LOG] 🔗 Stripe Checkout created id={checkout_id} url={('…'+checkout_url[-24:]) if checkout_url else None}")
     except Exception as e:
         print("[TOOL LOG] 🔗 PaymentService error (non-fatal):", e)
 
     print(f"[TOOL LOG] 🔗 createPaymentLink -> awaiting_payment=True, status=pending, quote={quote}")
     return "link_created"
-
 
 @function_tool
 async def checkPaymentStatus(args: CheckPaymentStatusArgs) -> str:
@@ -296,7 +295,6 @@ async def checkPaymentStatus(args: CheckPaymentStatusArgs) -> str:
     status = PaymentService.check_payment_status(getattr(sess, "conversation_id", None))
     if status in ("completed", "pending", "failed"):
         setattr(sess, "payment_status", status)
-        # ⬇️ NEW: flip flags so we can trigger the Payment Agent summary right after completion
         if status == "completed":
             setattr(sess, "awaiting_payment", False)
             setattr(sess, "show_payment_summary", True)  # trigger flag
@@ -358,7 +356,11 @@ base_agent = Agent(
         + BasePrompt.get_mode_prompt()
         + "\n\nRouting rules:\n"
         "- When the user chooses an entity type (LLC / C-CORP / S-CORP), call `setEntityType` with that type immediately.\n"
-        "- Do NOT answer LLC- or Corp-specific questions here; ask to choose entity and set it via `setEntityType` first."
+        "- Do NOT answer LLC- or Corp-specific questions here; ask to choose entity and set it via `setEntityType` first.\n\n"
+        "CRITICAL OTP RULE:\n"
+        "- When user provides full name, valid email, and exactly 10-digit phone number, you MUST call sendEmailOtp function immediately.\n"
+        "- NEVER say you sent a code without actually calling the sendEmailOtp function.\n"
+        "- Only after successfully calling sendEmailOtp should you tell the user the code was sent."
     ),
     tools=[sendEmailOtp, verifyEmailOtp, setEntityType]
 )
@@ -385,14 +387,16 @@ def banner_for(session: Optional[OpenAIConversationsSession]) -> str:
     return f"**Conversation ID:** `{cid}` — keep this if you want to resume later." if cid else ""
 
 def init_session() -> OpenAIConversationsSession:
-    import traceback
     s = OpenAIConversationsSession()
+    # ✅ always have a conv_id from the very first render
+    if not getattr(s, "conversation_id", None):
+        setattr(s, "conversation_id", str(uuid.uuid4()))
     setattr(s, "entity_type", "BASE")  # BASE | LLC | C-CORP | S-CORP | PAYMENT
     setattr(s, "awaiting_payment", False)
     setattr(s, "payment_status", None)
-    print("[AGENT LOG] 🧭 init_session -> entity_type = BASE")
-    print("[DEBUG] init_session call stack:")
-    traceback.print_stack(limit=5)
+    # ✅ Add persistent conversation history array
+    setattr(s, "conversation_history", [])
+    print("[AGENT LOG] 🧭 init_session -> entity_type = BASE, conv_id =", getattr(s, "conversation_id"))
     return s
 
 
@@ -402,8 +406,11 @@ def _save_session_attributes(conv_id: str, session: OpenAIConversationsSession):
     if not conv_id:
         return
     
+    # ✅ Store the actual session object in memory to preserve conversation history
+    global _SESSION_STORE
+    _SESSION_STORE[conv_id] = session
+    
     try:
-        # Save key attributes that need to persist across payment flow
         session_data = {
             "entity_type": getattr(session, "entity_type", "BASE"),
             "awaiting_payment": getattr(session, "awaiting_payment", False),
@@ -411,25 +418,21 @@ def _save_session_attributes(conv_id: str, session: OpenAIConversationsSession):
             "payment_quote": getattr(session, "payment_quote", None),
             "payment_checkout_url": getattr(session, "payment_checkout_url", None),
             "payment_checkout_id": getattr(session, "payment_checkout_id", None),
+            # ✅ Add conversation history to saved attributes
+            "conversation_history": getattr(session, "conversation_history", []),
         }
-        
-        # ✅ FIX: Use separate key structure to avoid conflict with PaymentService
         sessions_file = "payment_sessions.json"
         try:
             with open(sessions_file, 'r') as f:
                 all_data = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             all_data = {}
-        
-        # Store session attributes under a separate key to avoid conflict
         if "session_attributes" not in all_data:
             all_data["session_attributes"] = {}
         all_data["session_attributes"][conv_id] = session_data
-        
         with open(sessions_file, 'w') as f:
             json.dump(all_data, f, indent=2)
-        
-        print(f"[SESSION] 💾 Saved attributes for {conv_id}")
+        print(f"[SESSION] 💾 Saved session object and attributes for {conv_id}")
     except Exception as e:
         print(f"[SESSION] ⚠️ Failed to save session attributes: {e}")
 
@@ -437,12 +440,10 @@ def _load_session_attributes(conv_id: str) -> Optional[Dict]:
     """Load session attributes from disk."""
     if not conv_id:
         return None
-    
     try:
         sessions_file = "payment_sessions.json"
         with open(sessions_file, 'r') as f:
             all_data = json.load(f)
-        # ✅ FIX: Load from separate key structure to avoid conflict
         session_attributes = all_data.get("session_attributes", {})
         return session_attributes.get(conv_id)
     except (FileNotFoundError, json.JSONDecodeError, Exception) as e:
@@ -454,31 +455,122 @@ def _restore_or_create_session(conv_id: str) -> OpenAIConversationsSession:
     Try to restore an existing OpenAI conversation session or create a new one
     with the same conversation_id to preserve context.
     """
+    global _SESSION_STORE
+    
+    # ✅ First try to get the actual session object from memory
+    if conv_id in _SESSION_STORE:
+        session = _SESSION_STORE[conv_id]
+        print(f"[SESSION] ✅ Restored actual session object for {conv_id}")
+        return session
+    
+    # ✅ Fallback: create new session and restore attributes from disk
     try:
-        # Try to create session with existing conversation_id
-        # This should preserve the OpenAI conversation history
         session = OpenAIConversationsSession(conversation_id=conv_id)
-        
-        # If we have stored session attributes, restore them
         session_data = _load_session_attributes(conv_id)
         if session_data:
             for key, value in session_data.items():
                 setattr(session, key, value)
             print(f"[SESSION] ✅ Restored session attributes for {conv_id}")
         else:
-            # Set default attributes if no stored data
-            setattr(session, "entity_type", "PAYMENT")  # Assume returning from payment
+            setattr(session, "entity_type", "PAYMENT")
             setattr(session, "awaiting_payment", True)
+            # ✅ Initialize conversation history if not present
+            setattr(session, "conversation_history", [])
             print(f"[SESSION] 🆕 Created session with defaults for {conv_id}")
-            
+        
+        # ✅ Ensure conversation_history exists even if not in saved data
+        if not hasattr(session, "conversation_history"):
+            setattr(session, "conversation_history", [])
+        
+        # Store in memory for future use
+        _SESSION_STORE[conv_id] = session
         return session
     except Exception as e:
         print(f"[SESSION] ⚠️ Error restoring session {conv_id}: {e}")
-        # Fallback: create new session
         session = OpenAIConversationsSession(conversation_id=conv_id)
         setattr(session, "entity_type", "PAYMENT")
         setattr(session, "awaiting_payment", True)
+        # ✅ Initialize conversation history
+        setattr(session, "conversation_history", [])
+        _SESSION_STORE[conv_id] = session
         return session
+
+
+# ========= CONVERSATION HISTORY HELPERS =========
+def get_conversation_history(session: Optional[OpenAIConversationsSession]) -> list:
+    """Get the persistent conversation history array for the session."""
+    if not isinstance(session, OpenAIConversationsSession):
+        return []
+    return getattr(session, "conversation_history", [])
+
+def print_conversation_summary(session: Optional[OpenAIConversationsSession]):
+    """Print a summary of the conversation history for debugging."""
+    if not isinstance(session, OpenAIConversationsSession):
+        print("[CONVERSATION] No active session")
+        return
+    
+    history = getattr(session, "conversation_history", [])
+    conv_id = getattr(session, "conversation_id", "Unknown")
+    
+    print(f"[CONVERSATION] 📊 Summary for session {conv_id}:")
+    print(f"[CONVERSATION] Total exchanges: {len(history)}")
+    
+    for i, exchange in enumerate(history, 1):
+        timestamp = exchange.get("timestamp", "Unknown time")
+        agent_name = exchange.get("agent_name", "Unknown agent")
+        user_msg_preview = exchange.get("user_message", "")[:50] + "..." if len(exchange.get("user_message", "")) > 50 else exchange.get("user_message", "")
+        agent_msg_preview = exchange.get("agent_response", "")[:50] + "..." if len(exchange.get("agent_response", "")) > 50 else exchange.get("agent_response", "")
+        
+        print(f"[CONVERSATION] {i}. {timestamp} - {agent_name}")
+        print(f"[CONVERSATION]    User: {user_msg_preview}")
+        print(f"[CONVERSATION]    Agent: {agent_msg_preview}")
+
+def get_conversation_count(session: Optional[OpenAIConversationsSession]) -> int:
+    """Get the total number of conversation exchanges."""
+    if not isinstance(session, OpenAIConversationsSession):
+        return 0
+    history = getattr(session, "conversation_history", [])
+    return len(history)
+
+def clear_conversation_history(session: Optional[OpenAIConversationsSession]) -> bool:
+    """Clear the conversation history for a session."""
+    if not isinstance(session, OpenAIConversationsSession):
+        return False
+    
+    setattr(session, "conversation_history", [])
+    conv_id = getattr(session, "conversation_id", None)
+    if conv_id:
+        _save_session_attributes(conv_id, session)
+    
+    print(f"[CONVERSATION] 🗑️ Cleared conversation history for session {conv_id}")
+    return True
+
+def _preload_sessions_from_disk():
+    """Load all saved sessions into memory on app startup to handle restarts."""
+    global _SESSION_STORE
+    try:
+        sessions_file = "payment_sessions.json"
+        with open(sessions_file, 'r') as f:
+            all_data = json.load(f)
+        
+        session_attributes = all_data.get("session_attributes", {})
+        loaded_count = 0
+        
+        for conv_id in session_attributes.keys():
+            if conv_id not in _SESSION_STORE:
+                try:
+                    # This will automatically load from disk and add to _SESSION_STORE
+                    _restore_or_create_session(conv_id)
+                    loaded_count += 1
+                    print(f"[STARTUP] 📥 Preloaded session {conv_id}")
+                except Exception as e:
+                    print(f"[STARTUP] ⚠️ Failed to preload session {conv_id}: {e}")
+        
+        print(f"[STARTUP] 🚀 Preloaded {loaded_count} sessions from disk into global store")
+    except (FileNotFoundError, json.JSONDecodeError):
+        print("[STARTUP] 📝 No existing sessions file found")
+    except Exception as e:
+        print(f"[STARTUP] ⚠️ Error preloading sessions: {e}")
 
 
 # ========= SUMMARY TRIGGER =========
@@ -528,7 +620,7 @@ def on_load():
         banner_for(session),
         gr.update(interactive=False),
         gr.update(interactive=False),
-        gr.update(visible=False, value=""),  # pay_panel (unused)
+        gr.update(visible=False, value=""),
     )
 
 def start_or_resume(conv_id: str, session: Optional[OpenAIConversationsSession]):
@@ -571,8 +663,11 @@ def respond(message: str, history, session: Optional[OpenAIConversationsSession]
 
     if not hasattr(session, "entity_type"):
         session.entity_type = "BASE"
+    
+    # ✅ Initialize conversation_history if not present
+    if not hasattr(session, "conversation_history"):
+        setattr(session, "conversation_history", [])
 
-    # Broadened detection for "I've paid" phrasing to trigger status check
     lower_msg = (message or "").lower().strip()
     payment_return_substrings = [
         "i'm back", "back", "done", "completed", "paid",
@@ -608,7 +703,9 @@ def respond(message: str, history, session: Optional[OpenAIConversationsSession]
                 token = CURRENT_SESSION.set(session)
                 try:
                     print(f"[RUN LOG] 🔧 Runner.run({agent_name}) starting…")
+                    print(f"[DEBUG] Available tools: {[getattr(tool, 'name', str(tool)) for tool in current_agent.tools] if hasattr(current_agent, 'tools') else 'No tools'}")
                     result = loop.run_until_complete(Runner.run(current_agent, message, session=session))
+                    print(f"[DEBUG] Agent result: {result}")
                 finally:
                     CURRENT_SESSION.reset(token)
                 print(f"[RUN LOG] ✅ Runner.run({agent_name}) finished")
@@ -625,7 +722,28 @@ def respond(message: str, history, session: Optional[OpenAIConversationsSession]
         response_content = f"I encountered an error processing your message. Please try again. Error: {str(e)[:120]}..."
         print(f"[RUN LOG] ❌ Exception in respond: {e!r}")
 
-    # If payment just completed (flag set in checkPaymentStatus), run the Payment Agent summary now
+    # ✅ Add conversation exchange to persistent history array
+    import datetime
+    conversation_exchange = {
+        "timestamp": datetime.datetime.now().isoformat(),
+        "user_message": message,
+        "agent_response": response_content,
+        "agent_type": session.entity_type,
+        "agent_name": agent_name
+    }
+    
+    # Get current conversation history
+    conversation_history = getattr(session, "conversation_history", [])
+    conversation_history.append(conversation_exchange)
+    setattr(session, "conversation_history", conversation_history)
+    
+    print(f"[CONVERSATION] 📝 Added exchange to history. Total exchanges: {len(conversation_history)}")
+    
+    # ✅ Save session attributes to persist the conversation history
+    conv_id = getattr(session, "conversation_id", None)
+    if conv_id:
+        _save_session_attributes(conv_id, session)
+
     if session.entity_type == "PAYMENT" and getattr(session, "show_payment_summary", False):
         try:
             summary = _run_payment_completed_summary(session)
@@ -633,20 +751,15 @@ def respond(message: str, history, session: Optional[OpenAIConversationsSession]
         finally:
             setattr(session, "show_payment_summary", False)
 
-    # Detect the payment popup trigger line and replace with full payment details including URL
     checkout_url = getattr(session, "payment_checkout_url", None)
     if response_content.strip().startswith("_Your secure payment gateway is now open.") and checkout_url:
-        # Extract details from the trigger line
         import re
         match = re.search(r'Total due now: \$?([0-9.,]+).*Plan: ([^—]+)—([^+]+)\+.*State filing fees: \$?([0-9.,]+)', response_content)
-        
         if match:
             total_due = match.group(1)
             plan_name = match.group(2).strip()
             billing_cycle = match.group(3).strip()
             state_fee = match.group(4)
-            
-            # Replace with detailed payment response including the actual URL
             response_content = f"""🔗 **Your secure payment link is ready!**
 
 **Total Due Now: ${total_due}**
@@ -657,14 +770,11 @@ def respond(message: str, history, session: Optional[OpenAIConversationsSession]
 {checkout_url}
 
 Once you complete payment, return here and I'll automatically verify your payment status."""
-            
             print(f"[UI] 🔗 Payment trigger converted to full response with URL")
         else:
-            # Fallback: just append the URL
             response_content = response_content + f"\n\n**Payment Link:** {checkout_url}"
             print(f"[UI] 🔗 Payment URL appended to response")
 
-    # No popup needed - payment link is now directly in chat
     panel_update = gr.update(visible=False, value="")
 
     history = history + [
@@ -678,13 +788,10 @@ Once you complete payment, return here and I'll automatically verify your paymen
     )
 
 def process_url_params(qs: str, session: Optional[OpenAIConversationsSession], chat):
-    """Handle Stripe redirects like ?conv=...&payment=success&cs=... OR
-       ?conv_id=...&status=success&session_id=... to auto-check payment on reload."""
+    """(Legacy) Handle Stripe redirects; kept for compatibility if you wire it up."""
     from urllib.parse import parse_qs
     try:
         params = parse_qs((qs or "").lstrip("?"))
-
-        # Accept multiple aliases so either PaymentService style or app style works
         conv_id = (
             (params.get("conv_id") or params.get("conversation_id") or params.get("conv") or params.get("cid") or [None])
         )[0]
@@ -696,33 +803,26 @@ def process_url_params(qs: str, session: Optional[OpenAIConversationsSession], c
         )[0]
 
         if not conv_id:
-            # Nothing to do
             return chat, session, banner_for(session), gr.update(), gr.update(), gr.update(visible=False, value="")
 
-        # Resume or create a session for this conv_id
         if not isinstance(session, OpenAIConversationsSession) or getattr(session, "conversation_id", None) != conv_id:
             session = OpenAIConversationsSession(conversation_id=conv_id)
 
-        # Make sure we're in Payment mode on return
         setattr(session, "entity_type", "PAYMENT")
         setattr(session, "awaiting_payment", True)
 
-        # If Stripe gave us the Checkout Session ID in the URL, persist it for status checks
         if checkout_id:
             setattr(session, "payment_checkout_id", checkout_id)
             try:
-                # Ensures check_payment_status can retrieve it after reload
                 PaymentService._store_checkout_session_id(conv_id, checkout_id)
             except Exception as e:
                 print("[UI LOG] process_url_params: failed to persist mapping:", e)
 
-        # Check status right away using the same conversation_id
         st = PaymentService.check_payment_status(conv_id)
         setattr(session, "payment_status", st)
 
         if st == "completed":
             setattr(session, "awaiting_payment", False)
-            # Run & show the Payment Agent final summary immediately
             summary = _run_payment_completed_summary(session)
             new_msg_block = summary
         elif st == "pending":
@@ -742,17 +842,18 @@ def process_url_params(qs: str, session: Optional[OpenAIConversationsSession], c
         print("[UI LOG] process_url_params error:", e)
         return chat, session, banner_for(session), gr.update(), gr.update(), gr.update(visible=False, value="")
 
-def boot(qs: str = ""):
+def boot(qs: str = "", stored_cid: str = ""):
     """
-    Single entry on first paint. If returning from Stripe, resume the SAME
-    conversation_id in PAYMENT agent and show summary. Otherwise, start fresh.
+    Single entry on first paint.
+    If returning from Stripe or refresh, resume the SAME conversation_id
+    (from URL or localStorage) in PAYMENT agent and show summary.
+    Otherwise, start fresh.
     """
     from urllib.parse import parse_qs
 
-    print(f"[BOOT] 🔄 boot() called with qs='{qs}'")
+    print(f"[BOOT] 🔄 boot() called with qs='{qs}', stored_cid='{stored_cid}'")
 
     params = parse_qs((qs or "").lstrip("?"))
-    # Accept both your old and new param names
     conv_id = (
         (params.get("conv_id") or params.get("conversation_id") or
          params.get("conv")    or params.get("cid") or [None])
@@ -766,38 +867,32 @@ def boot(qs: str = ""):
          params.get("cs") or [None])
     )[0]
 
-    # ✅ FIX: Handle first load vs subsequent loads differently
+    # ✅ Fallback to localStorage value if URL doesn't have conv_id
+    # Handle case where stored_cid might be string 'None' or empty
+    if not conv_id and stored_cid and stored_cid != 'None' and stored_cid.strip():
+        conv_id = stored_cid
+        print(f"[BOOT] 💾 Using stored conv_id from localStorage: {conv_id}")
+
+    # First-time load (no URL params and no stored cid): create initial session
     if not conv_id:
-        # Check if this is the very first load (empty query string) vs a reload after payment
-        if not qs or qs.strip() == "":
-            print("[BOOT] 🆕 First load - creating initial session")
-            session = init_session()
-            hello = (
-                "Hello and welcome! I'm Incubation AI — here to help you turn your business idea into a registered reality.\n\n"
-                "What's needed next: Please share your **full legal name**, **email address**, and **primary phone number** "
-                "so we can set up your secure account and get you moving toward launch."
-            )
-            chat = [{"role": "assistant", "content": hello}]
-            return (
-                chat, session, banner_for(session),
-                gr.update(interactive=False), gr.update(interactive=False),
-                gr.update(visible=False, value="")
-            )
-        else:
-            print("[BOOT] ⚠️ Reload detected - preserving existing session")
-            return (
-        gr.update(),                      # keep chat
-        gr.update(),                      # keep st_session (OpenAIConversationsSession)
-        gr.update(),                      # keep banner
-        gr.update(),                      # keep conv_id_in
-        gr.update(),                      # keep start_btn
-        gr.update(visible=False, value="")# pay_panel (ok to hide)
-    )
+        print("[BOOT] 🆕 First load - creating initial session")
+        session = init_session()
+        hello = (
+            "Hello and welcome! I'm Incubation AI — here to help you turn your business idea into a registered reality.\n\n"
+            "What's needed next: Please share your **full legal name**, **email address**, and **primary phone number** "
+            "so we can set up your secure account and get you moving toward launch."
+        )
+        chat = [{"role": "assistant", "content": hello}]
+        return (
+            chat, session, banner_for(session),
+            gr.update(interactive=False), gr.update(interactive=False),
+            gr.update(visible=False, value=""),
+            getattr(session, "conversation_id", "")  # return conv_id for localStorage
+        )
 
-
-    # ✅ FIXED: Try to restore the existing session instead of creating a new one
+    # Stripe/refresh return — restore existing session
     session = _restore_or_create_session(conv_id)
-    
+
     # Ensure we're in Payment mode for status checking
     setattr(session, "entity_type", "PAYMENT")
     setattr(session, "awaiting_payment", True)
@@ -827,11 +922,21 @@ def boot(qs: str = ""):
     return (
         chat, session, banner_for(session),
         gr.update(interactive=False), gr.update(interactive=False),
-        gr.update(visible=False, value="")
+        gr.update(visible=False, value=""),
+        conv_id  # return conv_id for localStorage
     )
 
 
 def end_session(history, session: Optional[OpenAIConversationsSession]):
+    global _SESSION_STORE
+    
+    # ✅ Clear the stored session from memory
+    if isinstance(session, OpenAIConversationsSession):
+        conv_id = getattr(session, "conversation_id", None)
+        if conv_id and conv_id in _SESSION_STORE:
+            del _SESSION_STORE[conv_id]
+            print(f"[SESSION] 🗑️ Cleared stored session for {conv_id}")
+    
     end_note = "Session ended. You can now **paste a Conversation ID** (optional) and press **Start / Resume**."
     print("[UI LOG] 🛑 end_session -> dropping session & enabling Start/Resume inputs")
     return (
@@ -865,29 +970,35 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         end_btn = gr.Button("End Session", variant="stop")
         clear_btn = gr.Button("Clear Chat (keep session)")
 
-    # Keep for compatibility; not used in this patch
     pay_panel = gr.HTML(visible=False, value="")
 
     st_session = gr.State()
 
-    # Hidden box to catch URL params on load via client-side JS
-    url_params = gr.Textbox(visible=False)
+    # Local storage plumbed through hidden components
+    LOCAL_KEY = "incubation_conv_id"
+    conv_id_out = gr.Textbox(visible=False)  # Python -> Browser (to store)
+    qs_in = gr.State()                       # Browser -> Python (query string)
+    stored_cid_in = gr.State()               # Browser -> Python (localStorage value)
 
-    # Wire events (include pay_panel in outputs)
-   
-    # Capture window.location.search into url_params, then process it (if Stripe redirected here)
-    # One loader only: JS provides the query string to Python boot()
-    qs_in = gr.State()
-
+    # Single loader: pass URL + stored cid; receive conv_id to write to localStorage
     demo.load(
-    fn=boot,
-    inputs=[qs_in],
-    outputs=[chat, st_session, conv_banner, conv_id_in, start_btn, pay_panel],
-    js="() => [window.location.search]"
-)
+        fn=boot,
+        inputs=[qs_in, stored_cid_in],
+        outputs=[chat, st_session, conv_banner, conv_id_in, start_btn, pay_panel, conv_id_out],
+        js=f"""() => {{
+            const qs = window.location.search;
+            const stored = localStorage.getItem('{LOCAL_KEY}') || '';
+            return [qs, stored];
+        }}"""
+    )
 
-
-    
+    # When Python sends back a conv_id, write it to localStorage
+    conv_id_out.change(
+        fn=lambda cid: None,
+        inputs=[conv_id_out],
+        outputs=[],
+        js=f"(cid) => {{ if (cid) localStorage.setItem('{LOCAL_KEY}', cid); }}"
+    )
 
     start_btn.click(fn=start_or_resume, inputs=[conv_id_in, st_session],
                     outputs=[chat, st_session, conv_banner, conv_id_in, start_btn, pay_panel])
@@ -901,9 +1012,17 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         return []
 
     clear_btn.click(fn=clear_chat, outputs=[chat])
-    end_btn.click(fn=end_session, inputs=[chat, st_session],
-                  outputs=[chat, st_session, conv_banner, conv_id_in, start_btn, pay_panel])
+
+    # Clear localStorage on End Session too
+    end_btn.click(
+        fn=end_session,
+        inputs=[chat, st_session],
+        outputs=[chat, st_session, conv_banner, conv_id_in, start_btn, pay_panel],
+        js=f"() => localStorage.removeItem('{LOCAL_KEY}')"
+    )
 
 if __name__ == "__main__":
     print("🌐 SITE_URL:", os.getenv("SITE_URL"))
+    # ✅ Preload existing sessions from disk on startup to handle app restarts
+    _preload_sessions_from_disk()
     demo.queue().launch()

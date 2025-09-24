@@ -3,7 +3,7 @@ import json
 import os
 from typing import Optional, Dict, Any
 
-# Stripe is optional at import time; we'll fail gracefully if missing.
+# Stripe is optional at import-time so local dev won't crash if it's missing.
 try:
     import stripe  # pip install stripe
 except Exception:  # pragma: no cover
@@ -15,8 +15,9 @@ class PaymentService:
     Payment helpers (Stripe + State Filing Fees).
 
     Public methods used by the app:
-      - state_fee_lookup(state, entity_type) -> dict  (fresh fee result)
-      - create_payment_link(product_name, price, billing_cycle, state_fee, total_due_now, session_id) -> dict{id,url}
+      - state_fee_lookup(state, entity_type) -> dict
+      - create_payment_link(product_name, price, billing_cycle, state_fee, total_due_now,
+                            session_id, success_url=None, cancel_url=None) -> dict{id,url}
       - check_payment_status(session_id) -> 'completed' | 'pending' | 'failed' | 'unknown'
     """
 
@@ -129,6 +130,9 @@ class PaymentService:
         state_fee: float,
         total_due_now: float,
         session_id: Optional[str],
+        *,
+        success_url: Optional[str] = None,
+        cancel_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Returns {"id": "<checkout_session_id>", "url": "<checkout_url>"}.
@@ -147,11 +151,11 @@ class PaymentService:
         stripe.api_key = secret
 
         # Where to return after success/cancel (your Gradio origin)
-        site_url = os.getenv("SITE_URL", "http://127.0.0.1:7860").rstrip("/")
+        site_url = os.getenv("SITE_URL", "http://localhost:7860").rstrip("/")
 
         # Compose display names
         cycle_label = f" — {billing_cycle}" if billing_cycle else ""
-        plan_display = f"{product_name} Plan{cycle_label}".replace("yearly", "yearly").replace("monthly", "monthly")
+        plan_display = f"{product_name} Plan{cycle_label}"
 
         # Convert to cents (int)
         def to_cents(x: float) -> int:
@@ -159,7 +163,6 @@ class PaymentService:
 
         plan_cents = to_cents(price)
         state_fee_cents = to_cents(state_fee)
-        total_cents = to_cents(total_due_now)
 
         # Build line items
         line_items = [
@@ -181,8 +184,14 @@ class PaymentService:
             },
         ]
 
-        # Create Checkout Session
-        # Use Stripe's placeholder for session id in success_url so we can read it if needed in the browser.
+        # Respect explicit URLs if provided (so they match your process_url_params).
+        # Fallback to defaults that ALSO use conv_id/status/session_id param names.
+        if not success_url:
+            success_url = f"{site_url}?conv_id={session_id or ''}&status=success&session_id={{CHECKOUT_SESSION_ID}}"
+        if not cancel_url:
+            cancel_url = f"{site_url}?conv_id={session_id or ''}&status=cancel"
+
+        # Metadata is handy for dashboards and webhooks later
         metadata = {
             "conversation_id": session_id or "",
             "productName": product_name,
@@ -192,16 +201,13 @@ class PaymentService:
             "totalDueNow": str(total_due_now),
         }
 
-        success_url = f"{site_url}?payment=success&conv={session_id or ''}&cs={{CHECKOUT_SESSION_ID}}"
-        cancel_url = f"{site_url}?payment=cancel&conv={session_id or ''}"
-
+        # Create Checkout Session
         cs = stripe.checkout.Session.create(
             mode="payment",
             line_items=line_items,
             success_url=success_url,
             cancel_url=cancel_url,
             metadata=metadata,
-            # Optional niceties:
             allow_promotion_codes=True,
             invoice_creation={"enabled": False},
         )
@@ -219,8 +225,8 @@ class PaymentService:
         Returns:
           - 'completed' when Checkout Session status = 'complete' and payment_status = 'paid'
           - 'pending'   when not complete/paid yet
-          - 'failed'    when the session is 'expired' or explicitly failed
-          - 'unknown'   when no mapping / cannot retrieve
+          - 'failed'    when the session is 'expired'
+          - 'unknown'   when no mapping / cannot retrieve / misconfig
         """
         if stripe is None:
             return "unknown"
@@ -243,17 +249,13 @@ class PaymentService:
             print(f"[PaymentService] ⚠️ Stripe retrieve failed: {e}")
             return "unknown"
 
-        # Stripe semantics:
-        #   cs.status ∈ {'open', 'complete', 'expired'}
-        #   cs.payment_status ∈ {'unpaid', 'paid', 'no_payment_required'}
-        status = getattr(cs, "status", None)
-        payment_status = getattr(cs, "payment_status", None)
+        status = getattr(cs, "status", None)             # 'open' | 'complete' | 'expired'
+        payment_status = getattr(cs, "payment_status", None)  # 'unpaid' | 'paid' | ...
 
         if status == "complete" and payment_status == "paid":
             return "completed"
         if status == "expired":
             return "failed"
-        # Otherwise still waiting for user to pay/complete
         return "pending"
 
     # ====== Internals: Fee helpers ======

@@ -1,0 +1,157 @@
+{
+  "0d0d6825-20b3-4595-b2be-44b75f8e0cbb": "cs_test_b1KQ2Puv7Gh3MWu0Ydqycmi7EdxQtULkmD9I7N1sjQG9tnlIn1dLMuTxTa",
+  "1b0f9fef-af9f-4a65-8909-b019fabb12fb": "cs_test_b1CeZi06ko6sR7nUiVDNa8m9lOkjVSpWusXK7wqibdxSFDTWDJNx9ZUeeH",
+  "54ca8d40-6e1d-4dd7-8851-bec85b32a253": "cs_test_b1sfTRPREwtS1DKiyK3IO8gU45GxYffbkItRtXUY6gti2mr0NAE2h1akKJ",
+  "5b1e910e-78cf-497b-926d-2a835b34231b": "cs_test_b13owRtgigorxoDzRsltD3d3dzIWsqCtE9F1S9pPQkRVJINZsc1baGvU4H",
+  "a5ee7921-c5be-4670-a7ee-ccad84a239c1": "cs_test_b10woHV7DAfpnpD9oxIuFOXOFFDK9TT0REAPpv20TMwaq5OLxibxkAo2Ee",
+  "aef54d19-82af-4b84-a0aa-8025336cc265": "cs_test_b11cisBgCCrJcLxtEg7fQy1NcHS4XHXHO85piR5Z4UA7kJEGRvaaF24ob7",
+  "c33e8982-b66d-4403-ae61-7550e614ddc1": "cs_test_b1CfcTkH1QkUTsL4rlvJRRimfDEqCG3QS37XU8X6MkRAPAJJlbVQ0l6Uff",
+  "d2f21508-4673-4cd7-9196-f44515f2fbe9": {
+    "awaiting_payment": true,
+    "entity_type": "PAYMENT",
+    "payment_checkout_id": "cs_test_b12ky6HDofKVeJAwWrsdQehEGoQ1cMo61bFPoY6QeFJGNy0uoiscsEDNNL",
+    "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b12ky6HDofKVeJAwWrsdQehEGoQ1cMo61bFPoY6QeFJGNy0uoiscsEDNNL#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
+    "payment_quote": {
+      "billingCycle": "yearly",
+      "price": 299.0,
+      "productName": "Classic",
+      "stateFilingFee": 300.0,
+      "totalDueNow": 599.0
+    },
+    "payment_status": "pending"
+  },
+  "daab8b9b-4b3d-48e4-8cc7-11c249d5072e": "cs_test_b1Ycoz9hPdF4Zibpr9QtyJkYJgQsDtyAKJxui4q4PIMKxBGhNMJo1gwnmR",
+  "e0331e0b-1463-4c95-8a7b-8f1430821641": "cs_test_b1IXDPH9jfgKh1DzuHOkUDxL1RrOF7kMe8XrCMqdqGeq0HzK9HR5J5gBUh",
+  "e73a5832-894a-4a1f-9ba5-1aa5d359e438": "cs_test_b1G2f7VFi00qJ79G9IwvomY2UkWJKxful7cP7lJORlPpin6XWtJKz5qyJm",
+  "session_attributes": {
+    "0d0d6825-20b3-4595-b2be-44b75f8e0cbb": {
+      "awaiting_payment": true,
+      "entity_type": "PAYMENT",
+      "payment_checkout_id": "cs_test_b1KQ2Puv7Gh3MWu0Ydqycmi7EdxQtULkmD9I7N1sjQG9tnlIn1dLMuTxTa",
+      "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b1KQ2Puv7Gh3MWu0Ydqycmi7EdxQtULkmD9I7N1sjQG9tnlIn1dLMuTxTa#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
+      "payment_quote": {
+        "billingCycle": "yearly",
+        "price": 299.0,
+        "productName": "Classic",
+        "stateFilingFee": 300.0,
+        "totalDueNow": 599.0
+      },
+      "payment_status": "pending"
+    },
+    "54ca8d40-6e1d-4dd7-8851-bec85b32a253": {
+      "awaiting_payment": true,
+      "entity_type": "PAYMENT",
+      "payment_checkout_id": "cs_test_b1sfTRPREwtS1DKiyK3IO8gU45GxYffbkItRtXUY6gti2mr0NAE2h1akKJ",
+      "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b1sfTRPREwtS1DKiyK3IO8gU45GxYffbkItRtXUY6gti2mr0NAE2h1akKJ#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
+      "payment_quote": {
+        "billingCycle": "yearly",
+        "price": 299.0,
+        "productName": "Classic",
+        "stateFilingFee": 425.0,
+        "totalDueNow": 724.0
+      },
+      "payment_status": "pending"
+    },
+    "5b1e910e-78cf-497b-926d-2a835b34231b": {
+      "awaiting_payment": true,
+      "entity_type": "PAYMENT",
+      "payment_checkout_id": "cs_test_b13owRtgigorxoDzRsltD3d3dzIWsqCtE9F1S9pPQkRVJINZsc1baGvU4H",
+      "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b13owRtgigorxoDzRsltD3d3dzIWsqCtE9F1S9pPQkRVJINZsc1baGvU4H#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
+      "payment_quote": {
+        "billingCycle": "yearly",
+        "price": 299.0,
+        "productName": "Classic",
+        "stateFilingFee": 200.0,
+        "totalDueNow": 499.0
+      },
+      "payment_status": "pending"
+    },
+    "a5ee7921-c5be-4670-a7ee-ccad84a239c1": {
+      "awaiting_payment": true,
+      "entity_type": "PAYMENT",
+      "payment_checkout_id": "cs_test_b10woHV7DAfpnpD9oxIuFOXOFFDK9TT0REAPpv20TMwaq5OLxibxkAo2Ee",
+      "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b10woHV7DAfpnpD9oxIuFOXOFFDK9TT0REAPpv20TMwaq5OLxibxkAo2Ee#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
+      "payment_quote": {
+        "billingCycle": "yearly",
+        "price": 299.0,
+        "productName": "Classic",
+        "stateFilingFee": 200.0,
+        "totalDueNow": 499.0
+      },
+      "payment_status": "pending"
+    },
+    "aef54d19-82af-4b84-a0aa-8025336cc265": {
+      "awaiting_payment": true,
+      "entity_type": "PAYMENT",
+      "payment_checkout_id": "cs_test_b11cisBgCCrJcLxtEg7fQy1NcHS4XHXHO85piR5Z4UA7kJEGRvaaF24ob7",
+      "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b11cisBgCCrJcLxtEg7fQy1NcHS4XHXHO85piR5Z4UA7kJEGRvaaF24ob7#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
+      "payment_quote": {
+        "billingCycle": "yearly",
+        "price": 299.0,
+        "productName": "Classic",
+        "stateFilingFee": 200.0,
+        "totalDueNow": 499.0
+      },
+      "payment_status": "pending"
+    },
+    "c33e8982-b66d-4403-ae61-7550e614ddc1": {
+      "entity_type": "PAYMENT",
+      "awaiting_payment": true,
+      "payment_status": "pending",
+      "payment_quote": {
+        "productName": "Classic",
+        "price": 299.0,
+        "billingCycle": "yearly",
+        "stateFilingFee": 100.0,
+        "totalDueNow": 399.0
+      },
+      "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b1CfcTkH1QkUTsL4rlvJRRimfDEqCG3QS37XU8X6MkRAPAJJlbVQ0l6Uff#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
+      "payment_checkout_id": "cs_test_b1CfcTkH1QkUTsL4rlvJRRimfDEqCG3QS37XU8X6MkRAPAJJlbVQ0l6Uff"
+    },
+    "e0331e0b-1463-4c95-8a7b-8f1430821641": {
+      "awaiting_payment": true,
+      "entity_type": "PAYMENT",
+      "payment_checkout_id": "cs_test_b1IXDPH9jfgKh1DzuHOkUDxL1RrOF7kMe8XrCMqdqGeq0HzK9HR5J5gBUh",
+      "payment_checkout_url": "https://checkout.stripe.com/c/pay/cs_test_b1IXDPH9jfgKh1DzuHOkUDxL1RrOF7kMe8XrCMqdqGeq0HzK9HR5J5gBUh#fidkdWxOYHwnPyd1blpxYHZxWjA0V3NhN1NNcFxvRDZ3SkYxSHVsRkxHTzNiY0dpTGZiU28zN2x9MDZdVFxIRmtGbmJnVFd9TkNdcUptMnJrQ2pMbDdGdn9EQDFrNjBJTzRRbk9gQDxsdXZGNTVsdGhocGY2dicpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl",
+      "payment_quote": {
+        "billingCycle": "yearly",
+        "price": 299.0,
+        "productName": "Classic",
+        "stateFilingFee": 300.0,
+        "totalDueNow": 599.0
+      },
+      "payment_status": "pending"
+    },
+    "b0550629-70e6-4a96-95c2-fe719465296f": {
+      "entity_type": "BASE",
+      "awaiting_payment": false,
+      "payment_status": null,
+      "payment_quote": null,
+      "payment_checkout_url": null,
+      "payment_checkout_id": null,
+      "conversation_history": [
+        {
+          "timestamp": "2025-09-24T15:56:33.897773",
+          "user_message": "hi my name is Om Sharma, email: nanavi4722@dotxan.com, phone: 9876543211",
+          "agent_response": "[BASE AGENT]\n\nI've sent a secure 6-digit code to your email **nanavi4722@dotxan.com**. Please enter it here to verify your account before we continue. This is a key step to ensure your information stays private and secure.\n\n__Summary Table:__\n\n| __Field Name__ | __Value__ |\n| --- | --- |\n| __Full Name__ | Om Sharma |\n| __Email__ | nanavi4722@dotxan.com |\n| __Phone__ | 9876543211 |\n\nLooking forward to moving ahead with you!",
+          "agent_type": "BASE",
+          "agent_name": "Base Agent"
+        },
+        {
+          "timestamp": "2025-09-24T15:57:35.930743",
+          "user_message": "759065",
+          "agent_response": "[BASE AGENT]\n\n__Congratulations__, your email is verified and your secure account is all set! \ud83c\udf89  \nWe\u2019ve sent you a __welcome email__ with your __login credentials__ and __next steps__ \u2014 please check your __inbox__ (and __spam folder__, just in case).\n\nNow, let\u2019s get your incorporation details moving!\n\n__Summary Table:__\n\n| __Field Name__ | __Value__ |\n| --- | --- |\n| __Full Name__ | Om Sharma |\n| __Email__ | **nanavi4722@dotxan.com** |\n| __Phone__ | 9876543211 |\n\nPlease share your __proposed company name__, __business purpose__, and __U.S. state__ where you wish to incorporate next.",
+          "agent_type": "BASE",
+          "agent_name": "Base Agent"
+        },
+        {
+          "timestamp": "2025-09-24T15:59:18.725334",
+          "user_message": "State: Texas\nProposed Business Name: CleanSurge AI\nBusiness Purpose: We develop AI-powered environmental monitoring and pollution management platforms for industrial and municipal applications.",
+          "agent_response": "[BASE AGENT]\n\nFantastic! Let's ensure everything is captured correctly. Here's a summary of your incorporation details:\n\n__Summary Table:__\n\n| __Field Name__ | __Value__ |\n| --- | --- |\n| __Full Name__ | Om Sharma |\n| __Email__ | **nanavi4722@dotxan.com** |\n| __Phone__ | 9876543211 |\n| __Business Name__ | CleanSurge AI |\n| __Business Purpose__ | We develop AI-powered environmental monitoring and pollution management platforms for industrial and municipal applications. |\n| __State__ | Texas |\n\nNext, we'll need to select your __NAICS code__ which classifies your business for compliance and official records. Here are some options based on your description:\n\n1. **541511 - Custom Computer Programming Services** \u2014 Writing, modifying, testing, and supporting software to meet a client's specific requirements.\n2. **541512 - Computer Systems Design Services** \u2014 Planning and designing computer systems that integrate computer hardware, software, and communication technologies.\n3. **541620 - Environmental Consulting Services** \u2014 Providing advice and assistance to businesses and other organizations on environmental issues.\n4. **513210 - Data Processing, Hosting, and Related Services** \u2014 Providing the infrastructure for hosting or data processing services.\n\nPlease choose a number from the options above or describe the one you feel best fits your business.",
+          "agent_type": "BASE",
+          "agent_name": "Base Agent"
+        }
+      ]
+    }
+  }
+}
