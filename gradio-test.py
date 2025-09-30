@@ -6,12 +6,23 @@ import contextvars
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import TypedDict, Optional, Literal, Dict
+from pydantic import BaseModel
 
 # Bootstrap env (OpenAI, SendGrid, Stripe, SITE_URL, etc.)
 import config  # side-effect: sets env on import
 
 import gradio as gr
-from agents import Agent, Runner, function_tool, OpenAIConversationsSession
+from agents import (
+    Agent, 
+    Runner, 
+    function_tool, 
+    OpenAIConversationsSession,
+    GuardrailFunctionOutput,
+    InputGuardrailTripwireTriggered,
+    RunContextWrapper,
+    TResponseInputItem,
+    input_guardrail,
+)
 
 from base_prompt import BasePrompt
 from llc_prompt import LLCPrompt
@@ -24,11 +35,246 @@ from otp_service import OTPService
 from payment_service import PaymentService
 
 
+# ========= ENTITY SWITCH GUARDRAIL MODELS =========
+
+class EntitySwitchRequestOutput(BaseModel):
+    is_entity_switch_request: bool
+    requested_entity_type: Optional[str]
+    reasoning: str
+    switch_allowed: bool  # Result after checking count
+
+class CheckEntitySwitchCountArgs(TypedDict):
+    current_entity_type: str
+    requested_entity_type: str
+
+@function_tool
+async def checkEntitySwitchCount(args: CheckEntitySwitchCountArgs) -> str:
+    """Check if entity switch is allowed based on current switch count and required fields"""
+    try:
+        sess = CURRENT_SESSION.get()
+        if not isinstance(sess, OpenAIConversationsSession):
+            print(f"[SWITCH COUNT TOOL] ❌ No valid session found")
+            return "false"
+        
+        current_entity = args.get("current_entity_type", "BASE")
+        requested_entity = args.get("requested_entity_type", "BASE")
+        
+        # If current_entity is empty or "CURRENT", get it from session
+        if not current_entity or current_entity == "CURRENT":
+            current_entity = getattr(sess, "entity_type", "BASE")
+        current_switches = getattr(sess, "entity_switch_count", 0)
+        
+        print(f"[SWITCH COUNT TOOL] Check: {current_entity} → {requested_entity}, current_switches: {current_switches}")
+        
+        # Check if this is actually a switch (not initial setting from BASE)
+        # inside checkEntitySwitchCount(...)
+        if current_entity != "BASE" and current_entity != requested_entity:
+                if current_switches >= ENTITY_SWITCH_LIMIT:
+                    print(f"[SWITCH COUNT TOOL] ⛔ Switch blocked - limit exceeded ({current_switches}/{ENTITY_SWITCH_LIMIT})")
+                    return "false"
+                print(f"[SWITCH COUNT TOOL] ✅ Switch allowed (no increment in this tool)")
+                return "true" 
+        # Not a real switch (initial selection or same entity) - but still check required fields
+        if current_entity == "BASE":
+            print(f"[SWITCH COUNT TOOL] ✅ Initial entity selection allowed - all required fields present")
+        else:
+            print(f"[SWITCH COUNT TOOL] ✅ Not a switch (same entity) - allowed")
+        return "true"
+        
+    except Exception as e:
+        print(f"[SWITCH COUNT TOOL] ❌ Error in tool: {e}")
+        return "false"
+
+entity_switch_guardrail_agent = Agent(
+    name="Entity Switch Guardrail Check",
+    instructions = (
+        "Analyze the user's message to determine if they are requesting to switch entity types.\n\n"
+        
+        "## TRIGGER CONDITIONS (Return TRUE only if user clearly expresses):\n"
+        "- Direct switch requests: 'switch to LLC', 'change to C-Corp', 'I want S-Corp instead'\n"
+        "- Entity change requests: 'let's do LLC', 'make it a corporation', 'change entity to'\n"
+        "- Comparison requests that imply switching: 'what about LLC instead', 'can we do C-Corp'\n\n"
+        
+        "## ENTITY TYPES TO DETECT:\n"
+        "- LLC, L.L.C., Limited Liability Company\n"
+        "- C-Corp, C-Corporation, C Corporation, Corporation\n" 
+        "- S-Corp, S-Corporation, S Corporation\n\n"
+        
+        "## DO NOT TRIGGER FOR:\n"
+        "✗ Questions about entity types: 'what is an LLC?', 'how does C-Corp work?'\n"
+        "✗ General information requests: 'tell me about corporations'\n"
+        "✗ Formation process questions: 'what's next for my LLC?'\n"
+        "✗ Business names containing entity words: 'LLC Solutions Inc'\n"
+        "✗ Designator selections: 'I choose LLC as designator'\n\n"
+        
+        "## DECISION CRITERIA:\n"
+        "1. The request must be about SWITCHING/CHANGING the current entity type\n"
+        "2. The intent must be EXPLICIT and CLEAR\n"
+        "3. Must identify the target entity type they want to switch TO\n"
+        "4. Be conservative - when in doubt, DO NOT trigger\n\n"
+        
+        "## SWITCH VALIDATION PROCESS:\n"
+        "If you detect an entity switch request:\n"
+        "1. Extract and normalize the target entity type to: LLC, C-CORP, or S-CORP\n"
+        "2. Call checkEntitySwitchCount tool with:\n"
+        "   - current_entity_type: 'CURRENT' (tool will get actual current type from session)\n"
+        "   - requested_entity_type: the entity type they want to switch to\n"
+        "3. The tool will:\n"
+        "   - Check if switch count limit is exceeded\n"
+        "   - Increment count if switch is allowed\n"
+        "   - Return 'true' if allowed, 'false' if blocked\n"
+        "4. Set switch_allowed = true if tool returned 'true', switch_allowed = false if tool returned 'false'\n"
+        "5. CRITICAL: Always call the tool - it handles all count logic and returns simple boolean result"
+    ),
+    output_type=EntitySwitchRequestOutput,
+    tools=[checkEntitySwitchCount]
+)
+
+# ========= RESTART GUARDRAIL MODELS =========
+
+def _latest_user_text(inp) -> str:
+    if isinstance(inp, str):
+        return inp or ""
+    # inp can be list[TResponseInputItem] or list[dict]
+    for item in reversed(inp or []):
+        role = (getattr(item, "role", None) or (isinstance(item, dict) and item.get("role")) or "").lower()
+        if role == "user":
+            return (getattr(item, "content", None) or (isinstance(item, dict) and item.get("content")) or "").strip()
+    # fallback: last item content
+    last = (inp or [None])[-1]
+    return ((getattr(last, "content", None) or (isinstance(last, dict) and last.get("content")) or "") if last else "").strip()
+
+
+class RestartRequestOutput(BaseModel):
+    is_restart_request: bool
+    reasoning: str
+
+restart_guardrail_agent = Agent(
+    name="Restart Guardrail Check",
+    instructions = (
+    "Analyze the user's message to determine if they are EXPLICITLY requesting to restart, "
+    "start fresh, or begin the entire entity formation process from the beginning.\n\n"
+    
+    "## TRIGGER CONDITIONS (Return TRUE only if user clearly expresses):\n"
+    "- Direct restart requests: 'restart', 'start over', 'begin again', 'start from scratch'\n"
+    "- Fresh start requests: 'start fresh', 'fresh start', 'start anew'\n"
+    "- Reset requests: 'reset everything', 'reset the process', 'clear and restart'\n"
+    "- Complete restart phrases: 'start the entire process again', 'go back to the beginning'\n"
+    "- Abandonment + restart: 'forget everything and start over', 'discard this and restart'\n\n"
+    
+    "## EXPLICIT EXAMPLES TO TRIGGER:\n"
+    "✓ 'I want to start fresh'\n"
+    "✓ 'Let's start over'\n"
+    "✓ 'Can we restart this process?'\n"
+    "✓ 'I need to begin again'\n"
+    "✓ 'Start everything fresh'\n"
+    "✓ 'Reset and start from the beginning'\n"
+    "✓ 'Let's restart the formation process'\n"
+    "✓ 'Can I start from scratch?'\n"
+    "✓ 'I'd like to redo everything'\n\n"
+    
+    "## DO NOT TRIGGER FOR:\n"
+    "✗ Simple acknowledgments: 'ok', 'yes', 'no', 'sure', 'thanks'\n"
+    "✗ Personal information: names, emails, phone numbers, addresses\n"
+    "✗ Business information: company names, EIN numbers, business details\n"
+    "✗ Questions about the process: 'how do I start?', 'what's next?'\n"
+    "✗ Continuation phrases: 'let's continue', 'proceed', 'next step'\n"
+    "✗ Partial word matches in names: 'Restart LLC', 'Fresh Foods Inc'\n"
+    "✗ Editing requests: 'change my name', 'update my email'\n"
+    "✗ Starting a specific section: 'start the payment', 'begin filing'\n"
+    "✗ Questions containing keywords: 'when can I start my business?'\n\n"
+    
+    "## DECISION CRITERIA:\n"
+    "1. The request must be about restarting the ENTIRE formation process\n"
+    "2. The intent must be EXPLICIT and UNAMBIGUOUS\n"
+    "3. The message must clearly indicate discarding current progress\n"
+    "4. Be VERY conservative - when in doubt, DO NOT trigger\n"
+    "5. Ignore keyword matches in business names, personal names, or other contextual data\n\n"
+    
+    "Return TRUE only when there is crystal-clear, explicit intent to restart the complete "
+    "entity formation process from the beginning."
+),
+    output_type=RestartRequestOutput,
+)
+
+@input_guardrail
+async def entity_switch_guardrail(
+    ctx: RunContextWrapper[None], agent: Agent, input: str | list[TResponseInputItem]
+) -> GuardrailFunctionOutput:
+    """Check if user is requesting an entity switch and validate against switch limit."""
+    text = _latest_user_text(input)
+    if not text:
+        out = EntitySwitchRequestOutput(
+            is_entity_switch_request=False,
+            requested_entity_type=None,
+            reasoning="No user text found.",
+            switch_allowed=True
+        )
+        return GuardrailFunctionOutput(output_info=out, tripwire_triggered=False)
+
+    # Use the guardrail agent to dynamically analyze the user input
+    try:
+        result = await Runner.run(entity_switch_guardrail_agent, text)
+        print(f"[ENTITY GUARDRAIL] Agent analysis completed")
+    except Exception as e:
+        print(f"[ENTITY GUARDRAIL] ❌ Error running guardrail agent: {e}")
+        # If guardrail agent fails, allow the request to proceed
+        return GuardrailFunctionOutput(output_info=None, tripwire_triggered=False)
+
+    # Not a switch → allow
+    if not result.final_output or not result.final_output.is_entity_switch_request:
+        print(f"[ENTITY GUARDRAIL] ✅ Not a switch request - allowing")
+        return GuardrailFunctionOutput(output_info=result.final_output, tripwire_triggered=False)
+
+    # Blocked? mirror restart handling: DO NOT raise here.
+    if hasattr(result.final_output, "switch_allowed") and not result.final_output.switch_allowed:
+        new_type = result.final_output.requested_entity_type
+        print(f"[ENTITY GUARDRAIL] ⛔ Switch blocked by agent analysis")
+
+        # record context so respond() can show an entity-switch specific message
+        sess = CURRENT_SESSION.get()
+        try:
+            if isinstance(sess, OpenAIConversationsSession):
+                setattr(sess, "_tripwire", {"kind": "entity_switch", "target": new_type})
+        except Exception:
+            pass
+
+        # signal tripwire (Runner will raise InputGuardrailTripwireTriggered)
+        return GuardrailFunctionOutput(output_info=result.final_output, tripwire_triggered=True)
+
+    # Allowed → proceed
+    print(f"[ENTITY GUARDRAIL] ✅ Switch request allowed by agent analysis")
+    return GuardrailFunctionOutput(output_info=result.final_output, tripwire_triggered=False)
+
+
+@input_guardrail
+async def restart_guardrail(
+    ctx: RunContextWrapper[None], agent: Agent, input: str | list[TResponseInputItem]
+) -> GuardrailFunctionOutput:
+    """Stateless: evaluate only the most recent user message."""
+    text = _latest_user_text(input)
+    if not text:
+        out = RestartRequestOutput(is_restart_request=False, reasoning="No user text found.")
+        return GuardrailFunctionOutput(output_info=out, tripwire_triggered=False)
+
+    # ❗ Do NOT pass ctx.context or session here
+    result = await Runner.run(restart_guardrail_agent, text)
+
+    return GuardrailFunctionOutput(
+        output_info=result.final_output,
+        tripwire_triggered=bool(result.final_output and result.final_output.is_restart_request),
+    )
+
+
+
 # ========= GLOBAL CONTEXT =========
 CURRENT_SESSION = contextvars.ContextVar("CURRENT_SESSION", default=None)
 _SESSION_STORE = {}  # Store actual session objects to preserve conversation history
 _ACTIVE_EXTRACTIONS = set()  # Track active extraction sessions
 ENABLE_EXTRACTOR = True  # Set to False to disable extractor for debugging
+
+# ========= ENTITY SWITCH LIMITER =========
+ENTITY_SWITCH_LIMIT = 2  # Maximum number of entity switches allowed per session
 
 
 # ========= TOOL ARG TYPES =========
@@ -42,8 +288,6 @@ class VerifyEmailOtpArgs(TypedDict):
 class SetEntityArgs(TypedDict):
     entity_type: Literal["BASE", "LLC", "C-CORP", "S-CORP", "PAYMENT"]
 
-class UpdateEntityTypeArgs(TypedDict):
-    entity_type: Literal["LLC", "C-CORP", "S-CORP"]  # used in Payment to switch mid-checkout
 
 class UpdateToPaymentArgs(TypedDict):
     _: Optional[str]
@@ -146,7 +390,8 @@ def _check_formation_complete(sess, entity_type: str) -> bool:
     # Base required fields for all entities
     required_base_flags = [
         "user_data_collected",
-        "email_verified"
+        "email_verified",
+        "otp_verified"  # OTP verification required for formation completion
     ]
     
     # Check base requirements using flags
@@ -164,7 +409,7 @@ def _check_formation_complete(sess, entity_type: str) -> bool:
         llc_required_flags = [
             "llc_designator_set",      # LLC designator chosen
             "llc_governance_set",      # Governance type chosen
-            "llc_members_set",         # Member information provided
+            # "llc_members_set",         # ❌ REMOVED - Member information no longer required
             "registered_agent_set",    # Registered agent setup
             "virtual_address_set"      # Virtual address setup
         ]
@@ -182,7 +427,7 @@ def _check_formation_complete(sess, entity_type: str) -> bool:
         corp_required_flags = [
             "corp_designator_set",     # Corp designator chosen
             "authorized_shares_set",   # Share structure defined
-            "incorporators_set",       # Incorporator information provided
+            # "incorporators_set",       # ❌ REMOVED - Incorporator information no longer required
             "registered_agent_set",    # Registered agent setup
             "virtual_address_set"      # Virtual address setup
         ]
@@ -214,7 +459,7 @@ async def setFormationFlags(args: SetFormationFlagsArgs) -> str:
     setattr(sess, "email_verified", True)
     setattr(sess, "llc_designator_set", True)
     setattr(sess, "llc_governance_set", True)
-    setattr(sess, "llc_members_set", True)
+    # setattr(sess, "llc_members_set", True)  # ❌ REMOVED - No longer required
     setattr(sess, "registered_agent_set", True)
     setattr(sess, "virtual_address_set", True)
     
@@ -233,7 +478,7 @@ async def setCorpFormationFlags(args: SetCorpFormationFlagsArgs) -> str:
     setattr(sess, "email_verified", True)
     setattr(sess, "corp_designator_set", True)
     setattr(sess, "authorized_shares_set", True)
-    setattr(sess, "incorporators_set", True)
+    # setattr(sess, "incorporators_set", True)  # ❌ REMOVED - No longer required
     setattr(sess, "registered_agent_set", True)
     setattr(sess, "virtual_address_set", True)
     
@@ -414,7 +659,20 @@ async def sendEmailOtp(args: SendEmailOtpArgs) -> str:
 @function_tool
 async def verifyEmailOtp(args: VerifyEmailOtpArgs) -> str:
     print(f"[TOOL LOG] 🔐 verifyEmailOtp called for email={args.get('email')} code={args.get('code')}")
-    return otp.verify_otp_from_user(args)
+    result = otp.verify_otp_from_user(args)
+    
+    # Set OTP verification flag if verification was successful
+    sess = CURRENT_SESSION.get()
+    if isinstance(sess, OpenAIConversationsSession):
+        # Check if verification was successful - OTP service returns "Email verified successfully."
+        if "email verified successfully" in result.lower():
+            setattr(sess, "otp_verified", True)
+            setattr(sess, "email_verified", True)  # Also set email_verified for backward compatibility
+            print("[OTP LOG] ✅ OTP verification successful - flags set")
+        else:
+            print(f"[OTP LOG] ❌ OTP verification failed: {result}")
+    
+    return result
 
 @function_tool
 async def setEntityType(args: SetEntityArgs) -> str:
@@ -422,11 +680,37 @@ async def setEntityType(args: SetEntityArgs) -> str:
     if not isinstance(sess, OpenAIConversationsSession):
         print("[AGENT LOG] ❌ setEntityType called but no active session")
         return "No active session to update."
+
+    if not getattr(sess, "otp_verified", False):
+        print("[AGENT LOG] ⛔ setEntityType blocked - OTP not verified")
+        return "Please verify your email with the OTP code before selecting an entity type."
+
     new_type = args.get("entity_type", "BASE")
     old_type = getattr(sess, "entity_type", "BASE")
+
+    # real switch?
+    if old_type != "BASE" and old_type != new_type:
+        current_switches = getattr(sess, "entity_switch_count", 0)
+
+        if current_switches >= ENTITY_SWITCH_LIMIT:
+            print(f"[AGENT LOG] ⛔ setEntityType blocked - switch limit exceeded ({current_switches}/{ENTITY_SWITCH_LIMIT})")
+            # record for respond() UI copy
+            try:
+                if isinstance(sess, OpenAIConversationsSession):
+                    setattr(sess, "_tripwire", {"kind": "entity_switch", "target": new_type})
+            except Exception:
+                pass
+            # ❗ abort the turn so the LLM cannot continue with a “C-Corp” reply
+            raise InputGuardrailTripwireTriggered("entity_switch_limit_exceeded")
+
+        setattr(sess, "entity_switch_count", current_switches + 1)
+        print(f"[AGENT LOG] 📊 Entity switch count: {current_switches + 1}/{ENTITY_SWITCH_LIMIT}")
+
+    # only reached if allowed
     setattr(sess, "entity_type", new_type)
-    print(f"[AGENT LOG] 🔒 setEntityType -> {old_type} → {new_type}")
+    print(f"[AGENT LOG] 🔒 setEntityType -> {old_type} → {new_type} (OTP verified)")
     return f"Entity type set to {new_type}"
+
 
 @function_tool
 async def updateToPaymentMode(args: UpdateToPaymentArgs) -> str:
@@ -452,28 +736,14 @@ async def updateToPaymentMode(args: UpdateToPaymentArgs) -> str:
     setattr(sess, "ready_for_payment", False)
     
     old = getattr(sess, "entity_type", "BASE")
+    setattr(sess, "original_entity_type", old)  # ✅ Track the original entity type for payment processing
     setattr(sess, "entity_type", "PAYMENT")
+    setattr(sess, "payment_context", True)  # ✅ Flag that user is in payment flow
     setattr(sess, "awaiting_payment", False)
     setattr(sess, "payment_status", None)
-    print(f"[AGENT LOG] 💳 updateToPaymentMode -> {old} → PAYMENT (formation_complete=True)")
-    return "All formation details collected! Ready for payment selection."
+    print(f"[AGENT LOG] 💳 updateToPaymentMode -> {old} → PAYMENT (formation_complete=True, original_entity={old})")
+    return "Switching to payment mode."
 
-@function_tool
-async def updateEntityType(args: UpdateEntityTypeArgs) -> str:
-    sess = CURRENT_SESSION.get()
-    if not isinstance(sess, OpenAIConversationsSession):
-        print("[AGENT LOG] ❌ updateEntityType (Payment) called with no active session")
-        return "No active session to update."
-    target = _normalize_entity_label(args.get("entity_type", ""))
-    if target not in ("LLC", "C-Corp", "S-Corp"):
-        print(f"[AGENT LOG] ❌ updateEntityType (Payment) unsupported -> {target}")
-        return "Unsupported entity type."
-    old = getattr(sess, "entity_type", "PAYMENT")
-    setattr(sess, "entity_type", "LLC" if target == "LLC" else "C-CORP" if target == "C-Corp" else "S-CORP")
-    setattr(sess, "awaiting_payment", False)
-    setattr(sess, "payment_status", None)
-    print(f"[AGENT LOG] 🔁 updateEntityType (Payment) -> {old} → {getattr(sess,'entity_type')} (flags reset)")
-    return f"Entity type updated to {target}. We’ll refresh totals and continue."
 
 # Fallback fees
 _FALLBACK_FEES = {
@@ -741,8 +1011,7 @@ corp_agent = Agent(
     name="Corp Assistant",
     model="gpt-4o",
     instructions=(
-        "🏷️ AGENT IDENTIFICATION: You are the Corporate Formation Assistant. "
-        "Always start your responses with '[CORP AGENT]'.\n\n"
+        "🏷️ AGENT IDENTIFICATION: You are the Corporate Formation Assistant.\n\n"
         + CorpPrompt.get_mode_prompt()
         + "\n\nDATA COLLECTION RULES:\n"
         "- When user chooses designator (Inc./Corp./Corporation/Incorporated), call setCorpDesignator\n"
@@ -753,22 +1022,25 @@ corp_agent = Agent(
         "- When collecting user details, call setUserData\n"
         "- If user has already provided all information but flags aren't set, call setCorpFormationFlags to mark completion\n"
         + "\n\nRouting rules:\n"
-        "- If the user explicitly asks to switch entity type only to (LLC), call `setEntityType` with that type.\n"
-        "- Do not call the `setEntityType` if the switching is asked for entity type other than LLC.\n"
-        "- Do not answer LLC-specific questions in Corp mode; switch with `setEntityType` when appropriate.\n"
+        "- CRITICAL: NEVER CALL `setEntityType` FUNCTION unless the user's CURRENT message contains switch language like: 'switch to LLC', 'change to LLC', 'I want to switch to LLC', 'I want LLC instead'.\n"
+        "- ABSOLUTELY FORBIDDEN: Do NOT call `setEntityType` for ANY of these words: 'ok', 'proceed', 'yes', 'continue', 'go ahead', 'that sounds good', 'try again', 'let me know', or ANY confirmation language.\n"
+        "- IGNORE ALL CONVERSATION HISTORY when deciding whether to call `setEntityType`. Only look at the current message.\n"
+        "- Do not answer LLC-specific questions in Corp mode; ask user to explicitly request the switch if needed.\n"
         "- ONLY call `updateToPaymentMode` when user types exactly 'I Confirm' AND all corporation formation completion flags are set.\n"
         "- Never call `updateToPaymentMode` for phrases like 'ok', 'proceed', 'yes' - only 'I Confirm'.\n"
-        "- If formation check fails due to missing flags but user has provided all data, call setCorpFormationFlags first."
+        "- When calling `updateToPaymentMode`, do NOT add extra commentary - just call the tool and let the next agent handle the response.\n"
+        "- If formation check fails due to missing flags but user has provided all data, call setCorpFormationFlags first.\n"
+        "- If session has 'payment_context=True', user came from payment mode - they can return to payment with 'I Confirm'."
     ),
-    tools=[setEntityType, updateToPaymentMode, setCorpDesignator, setAuthorizedShares, setIncorporators, setRegisteredAgent, setVirtualBusinessAddress, setUserData, setCorpFormationFlags]
+    tools=[setEntityType, updateToPaymentMode, setCorpDesignator, setAuthorizedShares, setIncorporators, setRegisteredAgent, setVirtualBusinessAddress, setUserData, setCorpFormationFlags],
+    input_guardrails=[entity_switch_guardrail, restart_guardrail]
 )
 
 llc_agent = Agent(
     name="LLC Assistant",
     model="gpt-4o",
     instructions=(
-        "🏷️ AGENT IDENTIFICATION: You are the LLC Formation Assistant. "
-        "Always start your responses with '[LLC AGENT]'.\n\n"
+        "🏷️ AGENT IDENTIFICATION: You are the LLC Formation Assistant.\n\n"
         + LLCPrompt.get_mode_prompt()
         + "\n\nDATA COLLECTION RULES:\n"
         "- When user chooses designator (LLC/L.L.C./etc), call setLLCDesignator\n"
@@ -779,48 +1051,68 @@ llc_agent = Agent(
         "- When collecting user details, call setUserData\n"
         "- If user has already provided all information but flags aren't set, call setFormationFlags to mark completion\n"
         + "\n\nRouting rules:\n"
-        "- If the user explicitly asks to switch entity type only to (C-Corp or S-Corp) call `setEntityType` with that type.\n"
-        "- Do not call the `setEntityType` if the switching is asked for entity type other than S-Corp or C-Corp.\n"
-        "- Do not answer corporate-specific questions in LLC mode; switch with `setEntityType` when appropriate.\n"
+        "- CRITICAL: NEVER CALL `setEntityType` FUNCTION unless the user's CURRENT message contains switch language like: 'switch to C-Corp', 'switch to S-Corp', 'switch to C Corp', 'switch to S Corp', 'change to C-Corp', 'change to S-Corp', 'I want to switch to C-Corp', 'I want to switch to S-Corp', 'I want to switch to C Corp', 'I want to switch to S Corp'.\n"
+        "- ABSOLUTELY FORBIDDEN: Do NOT call `setEntityType` for ANY of these words: 'ok', 'proceed', 'yes', 'continue', 'go ahead', 'that sounds good', 'try again', 'let me know', or ANY confirmation language.\n"
+        "- IGNORE ALL CONVERSATION HISTORY when deciding whether to call `setEntityType`. Only look at the current message.\n"
+        "- Do not answer Corp-specific questions in LLC mode; ask user to explicitly request the switch if needed.\n"
         "- ONLY call `updateToPaymentMode` when user types exactly 'I Confirm' AND all LLC formation completion flags are set.\n"
         "- Never call `updateToPaymentMode` for phrases like 'ok', 'proceed', 'yes' - only 'I Confirm'.\n"
-        "- If formation check fails due to missing flags but user has provided all data, call setFormationFlags first."
+        "- When calling `updateToPaymentMode`, do NOT add extra commentary - just call the tool and let the next agent handle the response.\n"
+        "- If formation check fails due to missing flags but user has provided all data, call setFormationFlags first.\n"
+        "- If session has 'payment_context=True', user came from payment mode - they can return to payment with 'I Confirm'."
     ),
-    tools=[setEntityType, updateToPaymentMode, setLLCDesignator, setLLCGovernance, setLLCMembers, setRegisteredAgent, setVirtualBusinessAddress, setUserData, setFormationFlags]
+    tools=[setEntityType, updateToPaymentMode, setLLCDesignator, setLLCGovernance, setLLCMembers, setRegisteredAgent, setVirtualBusinessAddress, setUserData, setFormationFlags],
+    input_guardrails=[entity_switch_guardrail, restart_guardrail]
 )
 
 payment_agent = Agent(
     name="Payment Assistant",
     model="gpt-4o",
-    instructions=PaymentPrompt.getModePrompt(),
-    tools=[stateFeeLookup, createPaymentLink, checkPaymentStatus, updateEntityType]
+    instructions=(
+        "🏷️ AGENT IDENTIFICATION: You are the Payment Assistant.\n\n"
+        
+        "CONTEXT DETECTION:\n"
+        "- If you receive 'SYSTEM_TRIGGER:PAYMENT_CONFIRMED', this is a payment completion summary request.\n"
+        "  Generate a comprehensive congratulatory summary with plan details, total costs, and next steps.\n"
+        "  Be warm, professional, and include all payment/formation information.\n\n"
+        
+        "- If this is your first activation after user transitions to payment mode (no system trigger):\n"
+        "  RESPOND WITH EXACTLY: 'here is your secure payment pop up to complete your incorporation'\n"
+        "  CRITICAL: Do NOT add any other text. No explanations, no questions, no suggestions, no emojis.\n"
+        "  Just the exact phrase above and nothing else.\n\n"
+        
+        "- For all other payment interactions, provide helpful payment assistance using available tools."
+    ),
+    tools=[stateFeeLookup, createPaymentLink, checkPaymentStatus],
+    input_guardrails=[entity_switch_guardrail, restart_guardrail]
 )
 
 base_agent = Agent(
     name="Incubation AI (Base Assistant)",
     model="gpt-4o",
     instructions=(
-        "🏷️ AGENT IDENTIFICATION: You are the Base Assistant. "
-        "Always start your responses with '[BASE AGENT]'.\n\n"
+        "🏷️ AGENT IDENTIFICATION: You are the Base Assistant.\n\n"
         + BasePrompt.get_mode_prompt()
         + "\n\nRouting rules:\n"
-        "- When the user chooses an entity type (LLC / C-CORP / S-CORP), call `setEntityType` with that type immediately.\n"
-        "- Do NOT answer LLC- or Corp-specific questions here; ask to choose entity and set it via `setEntityType` first.\n\n"
+        "- ONLY call `setEntityType` when the user EXPLICITLY chooses an entity type like 'LLC', 'C-Corp', or 'S-Corp'.\n"
+        "- Do NOT call `setEntityType` for NAICS code selections, numbers, or other non-entity choices.\n"
+        "- Do NOT answer LLC- or Corp-specific questions here; ask to choose entity and set it via `setEntityType` first.\n"
+        "- After collecting name, email, phone, business name, purpose, state, and NAICS code, ask user to choose entity type.\n\n"
         "CRITICAL OTP RULE:\n"
         "- When user provides full name, valid email, and exactly 10-digit phone number, you MUST call sendEmailOtp function immediately.\n"
         "- NEVER say you sent a code without actually calling the sendEmailOtp function.\n"
         "- Only after successfully calling sendEmailOtp should you tell the user the code was sent.\n"
         "- When collecting user details, call setUserData to store them properly."
     ),
-    tools=[sendEmailOtp, verifyEmailOtp, setEntityType, setUserData]
+    tools=[sendEmailOtp, verifyEmailOtp, setEntityType, setUserData],
+    input_guardrails=[entity_switch_guardrail, restart_guardrail]
 )
 
 extractor_agent = Agent(
     name="Conversation Extractor",
     model="gpt-4o",
     instructions=(
-        "🏷️ AGENT IDENTIFICATION: You are the Conversation Extractor Agent. "
-        "Always start your responses with '[EXTRACTOR AGENT]'.\n\n"
+        "🏷️ AGENT IDENTIFICATION: You are the Conversation Extractor Agent.\n\n"
         + ExtractorPrompt.get_mode_prompt()
     ),
     tools=[]
@@ -867,6 +1159,10 @@ def _initialize_completion_flags(session: OpenAIConversationsSession):
     # Base flags
     setattr(session, "user_data_collected", False)
     setattr(session, "email_verified", False)
+    setattr(session, "otp_verified", False)  # OTP verification flag
+    
+    # Entity switch counter
+    setattr(session, "entity_switch_count", 0)  # Initialize entity switch counter
     
     # LLC flags
     setattr(session, "llc_designator_set", False)
@@ -1000,7 +1296,7 @@ def _restore_or_create_session(conv_id: str) -> OpenAIConversationsSession:
                 setattr(session, key, value)
             print(f"[SESSION] ✅ Restored session attributes for {conv_id}")
         else:
-            setattr(session, "entity_type", "PAYMENT")
+            setattr(session, "entity_type", "BASE")
             setattr(session, "awaiting_payment", True)
             # ✅ Initialize conversation history if not present
             setattr(session, "conversation_history", [])
@@ -1014,6 +1310,10 @@ def _restore_or_create_session(conv_id: str) -> OpenAIConversationsSession:
         if not hasattr(session, "user_data_collected"):
             _initialize_completion_flags(session)
         
+        # ✅ Initialize entity switch counter if not present (for existing sessions)
+        if not hasattr(session, "entity_switch_count"):
+            setattr(session, "entity_switch_count", 0)
+        
         # ✅ Check existing data and set flags accordingly
         _check_and_set_existing_data_flags(session)
         
@@ -1023,7 +1323,7 @@ def _restore_or_create_session(conv_id: str) -> OpenAIConversationsSession:
     except Exception as e:
         print(f"[SESSION] ⚠️ Error restoring session {conv_id}: {e}")
         session = OpenAIConversationsSession(conversation_id=conv_id)
-        setattr(session, "entity_type", "PAYMENT")
+        setattr(session, "entity_type", "BASE")
         setattr(session, "awaiting_payment", True)
         # ✅ Initialize conversation history
         setattr(session, "conversation_history", [])
@@ -1259,6 +1559,46 @@ def respond(message: str, history, session: Optional[OpenAIConversationsSession]
             response_content = (result.final_output or "").strip()
             print(f"[RUN LOG] 💬 {agent_name} response (first 160): {response_content[:160]!r}")
 
+    except InputGuardrailTripwireTriggered as e:
+        print(f"[GUARDRAIL] Tripwire triggered: {e!s}")
+
+        # default restart response (same as you already had)
+        default_restart = (
+            "I understand you'd like to start fresh! 🔄\n\n"
+            "To begin a completely new formation process, please:\n\n"
+            "1. Click the **End Session** button below\n"
+            "2. Then click **Start / Resume** to begin with a clean slate\n\n"
+            "This will create a new conversation with a fresh session ID, and you can start over "
+            "with your entity formation from the beginning.\n\n"
+            "Would you like me to help you with anything else in your current session first?"
+        )
+
+        # Check if entity-switch guardrail set a tripwire context
+        trip = {}
+        try:
+            if isinstance(session, OpenAIConversationsSession):
+                trip = getattr(session, "_tripwire", {}) or {}
+        except Exception:
+            trip = {}
+
+        if trip.get("kind") == "entity_switch":
+            target = trip.get("target") or "the new entity type"
+            response_content = (
+                f"I understand you'd like to explore {target} formation.\n\n"
+                f"For data integrity and security, we focus on one entity type per session after the initial selection. "
+                f"This keeps all your information accurate and properly organized.\n\n"
+                f"If you'd like to proceed with {target}, please click **End Session** and then **Start / Resume** to begin "
+                f"a new session for a clean slate."
+            )
+            # clear the flag
+            try:
+                setattr(session, "_tripwire", {})
+            except Exception:
+                pass
+        else:
+            # restart (or any other guardrail without context)
+            response_content = default_restart
+
     except Exception as e:
         response_content = f"I encountered an error processing your message. Please try again. Error: {str(e)[:120]}..."
         print(f"[RUN LOG] ❌ Exception in respond: {e!r}")
@@ -1304,29 +1644,8 @@ def respond(message: str, history, session: Optional[OpenAIConversationsSession]
         finally:
             setattr(session, "show_payment_summary", False)
 
-    checkout_url = getattr(session, "payment_checkout_url", None)
-    if response_content.strip().startswith("_Your secure payment gateway is now open.") and checkout_url:
-        import re
-        match = re.search(r'Total due now: \$?([0-9.,]+).*Plan: ([^—]+)—([^+]+).*State filing fees: \$?([0-9.,]+)', response_content)
-        if match:
-            total_due = match.group(1)
-            plan_name = match.group(2).strip()
-            billing_cycle = match.group(3).strip()
-            state_fee = match.group(4)
-            response_content = f"""🔗 **Your secure payment link is ready!**
-
-**Total Due Now: ${total_due}**
-- Plan: {plan_name} — {billing_cycle}
-- State filing fees: ${state_fee}
-
-**Click here to complete your payment:**
-{checkout_url}
-
-Once you complete payment, return here and I'll automatically verify your payment status."""
-            print(f"[UI] 🔗 Payment trigger converted to full response with URL")
-        else:
-            response_content = response_content + f"\n\n**Payment Link:** {checkout_url}"
-            print(f"[UI] 🔗 Payment URL appended to response")
+    # Clean approach: Let the Payment Agent handle formatting via function calls
+    # No more static regex parsing - the AI will use formatPaymentLink function instead
 
     panel_update = gr.update(visible=False, value="")
 
